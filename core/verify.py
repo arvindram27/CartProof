@@ -6,6 +6,12 @@ and never touches ``/_control/`` or fault configuration - it sees only what a
 real agent could see through the adapter: observation rereads (DOM and API,
 each carrying the cart ``version`` and contents), action evidence, and the task
 spec.
+
+Settlement uses the owned store's monotonic per-cart version to order reads
+against writes. A sample completed after the settle deadline cannot confirm; a
+sample whose channels disagree on version (with the lower below ``known_version``)
+is provably stale, not a source conflict; a genuinely conflicting same-version
+line/total mismatch is a source conflict; malformed evidence is ``unknown``.
 """
 from __future__ import annotations
 
@@ -29,6 +35,10 @@ def _version(payload: Any) -> Optional[int]:
     return None
 
 
+def _is_read_timeout(payload: Any) -> bool:
+    return isinstance(payload, dict) and payload.get("read_timeout") is True
+
+
 def _norm_lines(lines: Any):
     if not isinstance(lines, list):
         return None
@@ -42,7 +52,7 @@ def _coherent(dom: Any, api: Any):
     """Compare DOM and API views: same version first, then content.
 
     Returns (ok, kind) where kind is 'ok', 'version', 'lines', 'total', or
-    'malformed'.
+    'malformed'. Timestamps are never part of this comparison.
     """
     if not isinstance(dom, dict) or not isinstance(api, dict):
         return False, "malformed"
@@ -62,6 +72,11 @@ def _coherent(dom: Any, api: Any):
     return True, "ok"
 
 
+def _min_version(dom: Any, api: Any) -> Optional[int]:
+    vs = [v for v in (_version(dom), _version(api)) if v is not None]
+    return min(vs) if vs else None
+
+
 def _delta(baseline_lines: list, final_lines: list) -> dict:
     b = quantities(baseline_lines or [])
     f = quantities(final_lines or [])
@@ -75,7 +90,7 @@ def _delta(baseline_lines: list, final_lines: list) -> dict:
 
 def _best_effort_state(dom: Any, api: Any) -> dict:
     for p in (api, dom):
-        if isinstance(p, dict):
+        if isinstance(p, dict) and not _is_read_timeout(p):
             return {
                 "version": p.get("version"),
                 "lines": p.get("lines") or [],
@@ -97,7 +112,7 @@ def _state_summary(view: Optional[dict]) -> dict:
 class Verifier:
     def __init__(self, reader, settle_ms: int = 2000, interval_ms: int = 100,
                  now_ms_fn=None, sleep_ms_fn=None):
-        self.reader = reader  # () -> (dom_payload, api_payload)
+        self.reader = reader  # reader(timeout_ms) -> (dom_payload, api_payload)
         self.settle_ms = settle_ms
         self.interval_ms = interval_ms
         self.now_ms_fn = now_ms_fn or (lambda: int(time.monotonic() * 1000))
@@ -111,12 +126,17 @@ class Verifier:
         # fixed generous deadline (the standard 3-sample rule) independent of the
         # tuneable settle deadline.
         self.baseline_settle_ms = 2000
+        # Append-only audit log of every settlement reread; provenance references
+        # entries in here, never report-time placeholders.
+        self.samples: list = []
+        self._sample_counter = 0
+        self._settled_provenance: tuple = ()
 
     # ------------------------------------------------------------------ #
     # Baseline
     # ------------------------------------------------------------------ #
     def take_baseline(self) -> dict:
-        status, dom, api = self._sample(None, deadline_ms=self.baseline_settle_ms)
+        status, dom, api = self._sample(None, deadline_ms=self.baseline_settle_ms, phase="baseline")
         if status != "settled":
             raise RuntimeError(f"baseline did not settle (status={status})")
         self.baseline = {
@@ -187,27 +207,37 @@ class Verifier:
     # Completion tier
     # ------------------------------------------------------------------ #
     def finish(self, ledger: Ledger, declared_additions: dict) -> dict:
-        status, dom, api = self._sample(self.known_version)
+        status, dom, api = self._sample(self.known_version, phase="completion")
 
         constraints_report = []
         confirmed = 0
         total = len(ledger.constraints)
 
-        if status == "settled":
+        if self.anomaly_epoch:
+            # Defect 3: an active anomaly epoch blocks per-constraint confirmation
+            # even if _sample returned "settled" at the reconciled version.
+            final_info = _best_effort_state(dom, api)
+            obs_lines = final_info.get("lines") or []
+            delta = _delta(self.baseline["lines"], obs_lines)
+            delta_ok = (delta == declared_additions)
+            for c in ledger.constraints:
+                constraints_report.append({
+                    "label": c.label(), "state": UNKNOWN, "provenance": (),
+                    "reason": self._completion_failure_reason(status, c, obs_lines),
+                    "historical": False,
+                })
+            preserved = [sku for sku in quantities(self.baseline["lines"]) if sku not in delta]
+        elif status == "settled":
             view = {
                 "version": api["version"],
                 "lines": api["lines"],
                 "total_cents": api["total_cents"],
             }
-            ts = _now_iso()
             for c in ledger.constraints:
                 state, reason = evaluate(c, view)
-                prov = (
-                    {"source": "dom_reread", "version": view["version"], "timestamp": ts},
-                    {"source": "api_reread", "version": view["version"], "timestamp": ts},
-                )
                 constraints_report.append({
-                    "label": c.label(), "state": state, "provenance": prov,
+                    "label": c.label(), "state": state,
+                    "provenance": self._settled_provenance,
                     "reason": reason, "historical": False,
                 })
                 if state == CONFIRMED:
@@ -247,6 +277,8 @@ class Verifier:
             "delta": delta,
             "delta_consistent": delta_ok,
             "preserved": preserved,
+            "samples": list(self.samples),
+            "settle_ms": self.settle_ms,
             "verdict": verdict,
             "confirmed_count": confirmed,
             "total": total,
@@ -268,6 +300,8 @@ class Verifier:
             return "anomaly epoch: state changed by an unexplained external write" + extra
         if status == "conflict":
             return "conflicting DOM/API sources"
+        if status == "malformed":
+            return "malformed or insufficient evidence"
         if status == "stale":
             return "no fresh settled view within deadline (version below known_version)"
         return "no fresh settled view within deadline"
@@ -275,18 +309,32 @@ class Verifier:
     # ------------------------------------------------------------------ #
     # Settlement sampling
     # ------------------------------------------------------------------ #
-    def _sample(self, known_version: Optional[int], deadline_ms: Optional[int] = None):
+    def _sample(self, known_version: Optional[int], deadline_ms: Optional[int] = None,
+                phase: str = "completion"):
         deadline = self.now_ms_fn() + (deadline_ms if deadline_ms is not None else self.settle_ms)
+        self._settled_provenance = ()  # clear any prior attempt's provenance
         last_sig = None
         streak = 0
+        streak_entries = []
         conflict_kind = None
+        saw_malformed = False
+        saw_read_timeout = False
         last_coherent_version = None
         dom = api = None
         while True:
-            dom, api = self.reader()
-            dv, av = _version(dom), _version(api)
+            if self.now_ms_fn() >= deadline:
+                break
+            remaining = max(1, deadline - self.now_ms_fn())
+            dom, api = self.reader(remaining)
+            read_at = _now_iso()
+            late = self.now_ms_fn() >= deadline
+            e_dom = self._record_sample("dom_reread", dom, read_at, phase, late)
+            e_api = self._record_sample("api_reread", api, read_at, phase, late)
+
+            # Upstream guard (unchanged): any validated version ABOVE known is an
+            # unexplained external advance and is always recorded.
             if known_version is not None:
-                for v in (dv, av):
+                for v in (_version(dom), _version(api)):
                     if v is not None and v > known_version:
                         self._anomaly(
                             "external_version_advance",
@@ -294,35 +342,90 @@ class Verifier:
                         )
                         self.anomaly_epoch = True
                         return "anomaly", dom, api
-            ok, kind = _coherent(dom, api)
-            if not ok:
-                conflict_kind = kind
+
+            # Read timeout is distinct from malformed evidence and from conflicts:
+            # it feeds the deadline-expiry outcome.
+            if _is_read_timeout(dom) or _is_read_timeout(api):
+                saw_read_timeout = True
                 streak = 0
                 last_sig = None
+                streak_entries = []
+                if late:
+                    break
+                self.sleep_ms_fn(self.interval_ms)
+                continue
+
+            ok, kind = _coherent(dom, api)
+            if not ok:
+                if kind == "version":
+                    lower = _min_version(dom, api)
+                    is_stale = (known_version is not None and lower is not None
+                                and lower < known_version)
+                    if not is_stale:
+                        conflict_kind = "version"
+                elif kind in ("lines", "total"):
+                    conflict_kind = kind
+                else:
+                    saw_malformed = True
+                streak = 0
+                last_sig = None
+                streak_entries = []
             else:
+                dv = _version(api)
                 last_coherent_version = dv
                 sig = (dv, _norm_lines(api.get("lines") or []), api.get("total_cents"))
                 if known_version is not None and dv is not None and dv < known_version:
                     # provably stale: never accumulates settlement
                     streak = 0
                     last_sig = None
+                    streak_entries = []
                 else:
                     if sig == last_sig:
                         streak += 1
+                        streak_entries.extend([e_dom, e_api])
                     else:
                         streak = 1
                         last_sig = sig
-                    if streak >= 3:
+                        streak_entries = [e_dom, e_api]
+                    if streak >= 3 and not late:
+                        self._settled_provenance = tuple(streak_entries)
                         return "settled", dom, api
+
+            if late:
+                break
             if self.now_ms_fn() >= deadline:
                 break
             self.sleep_ms_fn(self.interval_ms)
+
         if conflict_kind is not None:
             return "conflict", dom, api
+        if saw_malformed:
+            return "malformed", dom, api
+        if saw_read_timeout:
+            return "timeout", dom, api
         if (known_version is not None and last_coherent_version is not None
                 and last_coherent_version < known_version):
             return "stale", dom, api
         return "timeout", dom, api
+
+    def _record_sample(self, source: str, payload: Any, read_at: str,
+                       phase: str, late: bool) -> dict:
+        self._sample_counter += 1
+        ts = payload.get("timestamp") if isinstance(payload, dict) else None
+        raw_lines = payload.get("lines") if isinstance(payload, dict) else None
+        entry = {
+            "seq": self._sample_counter,
+            "phase": phase,
+            "source": source,
+            "version": _version(payload),
+            "lines": quantities(raw_lines) if isinstance(raw_lines, list) else {},
+            "total_cents": payload.get("total_cents") if isinstance(payload, dict) else None,
+            "timestamp": ts or read_at,
+            "timed_out": _is_read_timeout(payload),
+            "late": late,
+        }
+        self.samples.append(entry)
+        return entry
 
     def _anomaly(self, kind: str, detail: str) -> None:
         self.anomalies.append({"kind": kind, "detail": detail})
@@ -339,10 +442,21 @@ def _fmt_state(view: Optional[dict]) -> str:
     return f"version {view['version']}, lines {lines}, total {view.get('total_cents')}"
 
 
+def _fmt_sample(s: dict) -> str:
+    marks = []
+    if s.get("late"):
+        marks.append("late")
+    if s.get("timed_out"):
+        marks.append("read-timeout")
+    suffix = f" [{', '.join(marks)}]" if marks else ""
+    return (f"  #{s['seq']:<3} {s['phase']:<10} {s['source']:<11} v{s['version']} "
+            f"lines={s['lines']} total={s['total_cents']} {s['timestamp']}{suffix}")
+
+
 def render_report(report: dict) -> str:
     out = []
     out.append("")
-    out.append("=== CartProof verification report ===")
+    out.append(f"=== CartProof verification report (settle_ms={report.get('settle_ms')}) ===")
     out.append("")
     out.append(f"Ledger (version {report['ledger']['version']}):")
     out.append(json.dumps(report["ledger"], indent=2))
@@ -363,6 +477,16 @@ def render_report(report: dict) -> str:
         out.append("Declared additions: " + _fmt_delta(report["declared_additions"]))
     if report.get("preserved"):
         out.append("Preserved (seeded, unchanged): " + ", ".join(sorted(report["preserved"])))
+    out.append("")
+    out.append("Recorded settlement samples:")
+    for s in report.get("samples") or []:
+        out.append(_fmt_sample(s))
+    late_count = sum(1 for s in report.get("samples") or [] if s.get("late"))
+    timeout_count = sum(1 for s in report.get("samples") or [] if s.get("timed_out"))
+    if late_count or timeout_count:
+        out.append(f"Note: {late_count} sample(s) completed after expiry and "
+                   f"{timeout_count} read(s) timed out; the settle deadline bounds sampling "
+                   f"and such samples cannot confirm.")
     out.append("")
     if report["anomalies"]:
         out.append("Anomalies:")

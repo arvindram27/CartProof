@@ -170,8 +170,21 @@ def main(argv: list[str] | None = None) -> int:
                             raise ValueError(f"invalid seed line: {sl!r}")
                         session.seed_line(sku, qty)
 
-                    def reader():
-                        return read_dom_cart(session).payload, read_api_cart(session).payload
+                    def reader(timeout_ms):
+                        # DOM and API share one settle budget: recompute remaining
+                        # after the DOM read and give the API read only what is left.
+                        start = time.monotonic()
+                        dom = read_dom_cart(session, timeout_ms=timeout_ms)
+                        dom_payload = dict(dom.payload)
+                        dom_payload["timestamp"] = dom.timestamp
+                        remaining = timeout_ms - int((time.monotonic() - start) * 1000)
+                        if remaining <= 0:
+                            api_payload = {"read_timeout": True, "timestamp": dom.timestamp}
+                        else:
+                            api = read_api_cart(session, timeout_ms=remaining)
+                            api_payload = dict(api.payload)
+                            api_payload["timestamp"] = api.timestamp
+                        return dom_payload, api_payload
 
                     # 4. Baseline snapshot (same session; no fault active yet).
                     verifier = Verifier(reader, settle_ms=args.settle_ms)
