@@ -1,0 +1,210 @@
+{
+  "products": [
+    {
+      "id": "shoe-trail-runner",
+      "name": "Trail Runner",
+      "category": "shoes",
+      "base_price_cents": 8900,
+      "variants": [
+        {"sku": "SHOE-TRL-8-BLACK", "label": "Black", "size": "8", "color": "Black", "price_cents": 8900},
+        {"sku": "SHOE-TRL-8-NAVY", "label": "Navy", "size": "8", "color": "Navy", "price_cents": 8900},
+        {"sku": "SHOE-TRL-9-BLACK", "label": "Black", "size": "9", "color": "Black", "price_cents": 8900},
+        {"sku": "SHOE-TRL-9-NAVYBLUE", "label": "Navy Blue", "size": "9", "color": "Navy Blue", "price_cents": 8900}
+      ]
+    },
+    {
+      "id": "shoe-court-classic",
+      "name": "Court Classic",
+      "category": "shoes",
+      "base_price_cents": 6500,
+      "variants": [
+        {"sku": "SHOE-CRT-8-WHITE", "label": "White", "size": "8", "color": "White", "price_cents": 6500},
+        {"sku": "SHOE-CRT-9-WHITE", "label": "White", "size": "9", "color": "White", "price_cents": 6500},
+        {"sku": "SHOE-CRT-10-WHITE", "label": "White", "size": "10", "color": "White", "price_cents": 6500}
+      ]
+    },
+    {
+      "id": "shoe-city-walker",
+      "name": "City Walker",
+      "category": "shoes",
+      "base_price_cents": 7800,
+      "variants": [
+        {"sku": "SHOE-CTY-9-BROWN", "label": "Brown", "size": "9", "color": "Brown", "price_cents": 7800},
+        {"sku": "SHOE-CTY-10-BROWN", "label": "Brown", "size": "10", "color": "Brown", "price_cents": 7800}
+      ]
+    },
+    {
+      "id": "shoe-gym-trainer",
+      "name": "Gym Trainer",
+      "category": "shoes",
+      "base_price_cents": 7200,
+      "variants": [
+        {"sku": "SHOE-GYM-8-RED", "label": "Red", "size": "8", "color": "Red", "price_cents": 7200},
+        {"sku": "SHOE-GYM-9-RED", "label": "Red", "size": "9", "color": "Red", "price_cents": 7200}
+      ]
+    },
+    {
+      "id": "shoe-hiking-boot",
+      "name": "Hiking Boot",
+      "category": "shoes",
+      "base_price_cents": 11900,
+      "variants": [
+        {"sku": "SHOE-HIK-9-TAN", "label": "Tan", "size": "9", "color": "Tan", "price_cents": 11900},
+        {"sku": "SHOE-HIK-10-TAN", "label": "Tan", "size": "10", "color": "Tan", "price_cents": 11900}
+      ]
+    },
+    {
+      "id": "shoe-canvas-slipon",
+      "name": "Canvas Slip-on",
+      "category": "shoes",
+      "base_price_cents": 5400,
+      "variants": [
+        {"sku": "SHOE-CVS-8-NAVY", "label": "Navy", "size": "8", "color": "Navy", "price_cents": 5400},
+        {"sku": "SHOE-CVS-8-NAVYBLUE", "label": "Navy Blue", "size": "8", "color": "Navy Blue", "price_cents": 5400},
+        {"sku": "SHOE-CVS-9-NAVY", "label": "Navy", "size": "9", "color": "Navy", "price_cents": 5400}
+      ]
+    },
+    {
+      "id": "shoe-running-flat",
+      "name": "Running Flat",
+      "category": "shoes",
+      "base_price_cents": 6900,
+      "variants": [
+        {"sku": "SHOE-RUN-9-BLUE", "label": "Blue", "size": "9", "color": "Blue", "price_cents": 6900},
+        {"sku": "SHOE-RUN-10-BLUE", "label": "Blue", "size": "10", "color": "Blue", "price_cents": 6900}
+      ]
+    },
+    {
+      "id": "bottle-hiker",
+      "name": "Hiker Water Bottle",
+      "category": "bottles",
+      "base_price_cents": 2400,
+      "variants": [
+        {"sku": "BTL-HIK-500-NAVY", "label": "Navy", "size": "500ml", "color": "Navy", "price_cents": 2400},
+        {"sku": "BTL-HIK-500-NAVYBLUE", "label": "Navy Blue", "size": "500ml", "color": "Navy Blue", "price_cents": 2400},
+        {"sku": "BTL-HIK-750-STEEL", "label": "Steel", "size": "750ml", "color": "Steel", "price_cents": 2800}
+      ]
+    },
+    {
+      "id": "bottle-tumbler",
+      "name": "Insulated Tumbler",
+      "category": "bottles",
+      "base_price_cents": 3200,
+      "variants": [
+        {"sku": "BTL-TMB-12-SLATE", "label": "Slate", "size": "12oz", "color": "Slate", "price_cents": 3200},
+        {"sku": "BTL-TMB-16-SLATE", "label": "Slate", "size": "16oz", "color": "Slate", "price_cents": 3600}
+      ]
+    },
+    {
+      "id": "bottle-sports",
+      "name": "Sports Squeeze",
+      "category": "bottles",
+      "base_price_cents": 1500,
+      "variants": [
+        {"sku": "BTL-SPT-24-CLEAR", "label": "Clear", "size": "24oz", "color": "Clear", "price_cents": 1500},
+        {"sku": "BTL-SPT-32-CLEAR", "label": "Clear", "size": "32oz", "color": "Clear", "price_cents": 1800}
+      ]
+    },
+    {
+      "id": "bottle-thermo",
+      "name": "Thermo Flask",
+      "category": "bottles",
+      "base_price_cents": 4100,
+      "variants": [
+        {"sku": "BTL-THR-500-BLACK", "label": "Matte Black", "size": "500ml", "color": "Matte Black", "price_cents": 4100},
+        {"sku": "BTL-THR-750-BLACK", "label": "Matte Black", "size": "750ml", "color": "Matte Black", "price_cents": 4700}
+      ]
+    },
+    {
+      "id": "bottle-kids",
+      "name": "Kids Bottle",
+      "category": "bottles",
+      "base_price_cents": 1200,
+      "variants": [
+        {"sku": "BTL-KID-350-PINK", "label": "Pink", "size": "350ml", "color": "Pink", "price_cents": 1200},
+        {"sku": "BTL-KID-350-SKY", "label": "Sky", "size": "350ml", "color": "Sky", "price_cents": 1200}
+      ]
+    },
+    {
+      "id": "bottle-glass-infuser",
+      "name": "Glass Infuser",
+      "category": "bottles",
+      "base_price_cents": 2900,
+      "variants": [
+        {"sku": "BTL-GLS-400-CLEAR", "label": "Clear", "size": "400ml", "color": "Clear", "price_cents": 2900},
+        {"sku": "BTL-GLS-400-AMBER", "label": "Amber", "size": "400ml", "color": "Amber", "price_cents": 2900}
+      ]
+    },
+    {
+      "id": "bottle-growler",
+      "name": "Steel Growler",
+      "category": "bottles",
+      "base_price_cents": 5200,
+      "variants": [
+        {"sku": "BTL-GRW-1L-STEEL", "label": "Steel", "size": "1L", "color": "Steel", "price_cents": 5200},
+        {"sku": "BTL-GRW-2L-STEEL", "label": "Steel", "size": "2L", "color": "Steel", "price_cents": 6400}
+      ]
+    },
+    {
+      "id": "shirt-classic-tee",
+      "name": "Classic Tee",
+      "category": "shirts",
+      "base_price_cents": 2200,
+      "variants": [
+        {"sku": "SHT-TEE-M-NAVY", "label": "Navy", "size": "M", "color": "Navy", "price_cents": 2200},
+        {"sku": "SHT-TEE-M-NAVYBLUE", "label": "Navy Blue", "size": "M", "color": "Navy Blue", "price_cents": 2200},
+        {"sku": "SHT-TEE-L-NAVY", "label": "Navy", "size": "L", "color": "Navy", "price_cents": 2200}
+      ]
+    },
+    {
+      "id": "shirt-henley",
+      "name": "Henley",
+      "category": "shirts",
+      "base_price_cents": 2800,
+      "variants": [
+        {"sku": "SHT-HEN-M-CHARCOAL", "label": "Charcoal", "size": "M", "color": "Charcoal", "price_cents": 2800},
+        {"sku": "SHT-HEN-L-CHARCOAL", "label": "Charcoal", "size": "L", "color": "Charcoal", "price_cents": 2800}
+      ]
+    },
+    {
+      "id": "shirt-oxford",
+      "name": "Oxford Button-down",
+      "category": "shirts",
+      "base_price_cents": 4600,
+      "variants": [
+        {"sku": "SHT-OXF-M-WHITE", "label": "White", "size": "M", "color": "White", "price_cents": 4600},
+        {"sku": "SHT-OXF-L-WHITE", "label": "White", "size": "L", "color": "White", "price_cents": 4600}
+      ]
+    },
+    {
+      "id": "shirt-flannel",
+      "name": "Flannel",
+      "category": "shirts",
+      "base_price_cents": 3900,
+      "variants": [
+        {"sku": "SHT-FLN-M-REDPLAID", "label": "Red Plaid", "size": "M", "color": "Red Plaid", "price_cents": 3900},
+        {"sku": "SHT-FLN-L-REDPLAID", "label": "Red Plaid", "size": "L", "color": "Red Plaid", "price_cents": 3900}
+      ]
+    },
+    {
+      "id": "shirt-polo",
+      "name": "Polo",
+      "category": "shirts",
+      "base_price_cents": 3100,
+      "variants": [
+        {"sku": "SHT-POL-M-FOREST", "label": "Forest", "size": "M", "color": "Forest", "price_cents": 3100},
+        {"sku": "SHT-POL-L-FOREST", "label": "Forest", "size": "L", "color": "Forest", "price_cents": 3100}
+      ]
+    },
+    {
+      "id": "shirt-hoodie",
+      "name": "Hoodie",
+      "category": "shirts",
+      "base_price_cents": 5800,
+      "variants": [
+        {"sku": "SHT-HOO-M-HEATHER", "label": "Heather", "size": "M", "color": "Heather", "price_cents": 5800},
+        {"sku": "SHT-HOO-L-HEATHER", "label": "Heather", "size": "L", "color": "Heather", "price_cents": 5800}
+      ]
+    }
+  ]
+}

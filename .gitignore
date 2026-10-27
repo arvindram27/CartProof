@@ -1,0 +1,21 @@
+# Python virtualenv and bytecode
+.venv/
+__pycache__/
+*.py[cod]
+
+# Test cache
+.pytest_cache/
+
+# Local runtime artifacts (databases, screenshots, logs)
+var/
+*.db
+*.sqlite3
+
+# Secrets and credentials (excluded as a class)
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*credential*
+*secret*

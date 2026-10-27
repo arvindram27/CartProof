@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ product.name }} — CartProof Mock Store</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; color: #1a1a1a; }
+    label.variant { display: block; margin: 0.25rem 0; }
+    #status { margin: 0.75rem 0; min-height: 1.2em; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1 data-product-id="{{ product.id }}" data-name="{{ product.name }}">{{ product.name }}</h1>
+  <p class="category">{{ product.category }}</p>
+
+  <form id="variant-form" onsubmit="return false;">
+    {% for v in product.variants %}
+    <label class="variant">
+      <input type="radio" name="variant" value="{{ v.sku }}"
+             data-price-cents="{{ v.price_cents }}" {% if loop.first %}checked{% endif %}>
+      {{ v.label }}
+    </label>
+    {% endfor %}
+    <p>
+      <label>Quantity
+        <input type="number" id="quantity" name="quantity" min="1" max="99" value="1">
+      </label>
+    </p>
+    <button type="button" id="add-to-cart">Add to cart</button>
+  </form>
+
+  <div id="status"></div>
+  <p>Cart version: <span id="cart-version">{{ cart_version }}</span></p>
+  <p><a href="/cart">View cart</a> · <a href="/">Continue shopping</a></p>
+
+  <script>
+    let cartVersion = {{ cart_version }};
+    const statusEl = document.getElementById('status');
+    function selectedSku() {
+      const el = document.querySelector('input[name=variant]:checked');
+      return el ? el.value : null;
+    }
+    document.getElementById('add-to-cart').addEventListener('click', async function () {
+      const sku = selectedSku();
+      const qty = parseInt(document.getElementById('quantity').value, 10);
+      statusEl.textContent = '';
+      let resp;
+      try {
+        resp = await fetch('/api/cart/lines', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-Cart-Version': String(cartVersion)},
+          body: JSON.stringify({sku: sku, quantity: qty})
+        });
+      } catch (err) {
+        statusEl.textContent = 'Error: network failure';
+        return;
+      }
+      let data = {};
+      try { data = await resp.json(); } catch (e) { /* non-json */ }
+      if (resp.ok) {
+        cartVersion = data.version;
+        document.getElementById('cart-version').textContent = cartVersion;
+        statusEl.textContent = 'Added ' + qty + ' x ' + sku;
+      } else if (resp.status === 409) {
+        if (data.error && data.error.current_version != null) {
+          cartVersion = data.error.current_version;
+          document.getElementById('cart-version').textContent = cartVersion;
+        }
+        statusEl.textContent = 'Error: version conflict';
+      } else {
+        const msg = (data.error && data.error.message) || ('HTTP ' + resp.status);
+        statusEl.textContent = 'Error: ' + msg;
+      }
+    });
+  </script>
+</body>
+</html>

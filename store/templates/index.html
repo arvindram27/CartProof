@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>CartProof Mock Store</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; color: #1a1a1a; }
+    ul.products { list-style: none; padding: 0; }
+    li.product-card { border: 1px solid #ddd; border-radius: 6px; padding: 0.75rem 1rem; margin: 0.5rem 0; }
+    li.product-card a { font-weight: 600; text-decoration: none; color: #0b5fff; }
+    .category { color: #666; font-size: 0.85rem; margin-left: 0.75rem; }
+    .price { float: right; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>CartProof Mock Store</h1>
+  <form id="search" method="get" action="/">
+    <input type="text" id="q" name="q" placeholder="Search products" value="{{ q }}">
+    <button type="submit">Search</button>
+  </form>
+  <p><a href="/cart">View cart</a></p>
+  <ul class="products">
+  {% for p in products %}
+    <li class="product-card" data-product-id="{{ p.id }}" data-name="{{ p.name }}">
+      <a href="/product/{{ p.id }}">{{ p.name }}</a>
+      <span class="category">{{ p.category }}</span>
+      <span class="price">{{ p.price_label }}</span>
+    </li>
+  {% else %}
+    <li class="product-card">No products match "{{ q }}".</li>
+  {% endfor %}
+  </ul>
+  <script>
+    document.getElementById('search').addEventListener('submit', function (e) {
+      e.preventDefault();
+      window.location = '/?q=' + encodeURIComponent(document.getElementById('q').value);
+    });
+  </script>
+</body>
+</html>

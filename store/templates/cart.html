@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Your cart — CartProof Mock Store</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; color: #1a1a1a; }
+    ul#cart-lines { list-style: none; padding: 0; }
+    li.cart-line { border: 1px solid #ddd; border-radius: 6px; padding: 0.5rem 1rem; margin: 0.5rem 0; }
+    #cart-total { font-weight: 700; }
+  </style>
+</head>
+<body>
+  <h1>Your cart</h1>
+  <ul id="cart-lines">
+  {% for l in lines %}
+    <li class="cart-line"
+        data-line-id="{{ l.line_id }}"
+        data-sku="{{ l.sku }}"
+        data-quantity="{{ l.quantity }}"
+        data-unit-price-cents="{{ l.unit_price_cents }}">
+      {{ l.name }} ({{ l.label }}) &times; {{ l.quantity }}
+    </li>
+  {% else %}
+    <li class="cart-empty">Your cart is empty.</li>
+  {% endfor %}
+  </ul>
+  <p>Total: <span id="cart-total" data-total-cents="{{ total_cents }}">${{ "%.2f"|format(total_cents / 100) }}</span></p>
+  <p>Cart version: <span id="cart-version">{{ cart_version }}</span></p>
+  <p><a href="/">Continue shopping</a></p>
+</body>
+</html>
