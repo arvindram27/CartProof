@@ -1,0 +1,20 @@
+{
+  "items": [
+    {"product_query": "Hiker Water Bottle", "target_sku": "BTL-HIK-500-NAVYBLUE", "quantity": 1},
+    {"product_query": "Hiker Water Bottle", "target_sku": "BTL-HIK-750-STEEL", "quantity": 1}
+  ],
+  "constraints": [
+    {"type": "item_quantity", "sku": "BTL-HIK-500-NAVYBLUE", "quantity": 1},
+    {"type": "item_quantity", "sku": "BTL-HIK-750-STEEL", "quantity": 1},
+    {"type": "count_distinct", "count": 2, "skus": [
+      "BTL-HIK-500-NAVY", "BTL-HIK-500-NAVYBLUE", "BTL-HIK-750-STEEL",
+      "BTL-TMB-12-SLATE", "BTL-TMB-16-SLATE",
+      "BTL-SPT-24-CLEAR", "BTL-SPT-32-CLEAR",
+      "BTL-THR-500-BLACK", "BTL-THR-750-BLACK",
+      "BTL-KID-350-PINK", "BTL-KID-350-SKY",
+      "BTL-GLS-400-CLEAR", "BTL-GLS-400-AMBER",
+      "BTL-GRW-1L-STEEL", "BTL-GRW-2L-STEEL"
+    ]},
+    {"type": "budget_max", "max_cents": 6000}
+  ]
+}

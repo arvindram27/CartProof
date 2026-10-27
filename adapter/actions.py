@@ -84,8 +84,40 @@ class BrowserSession:
 
     def add_to_cart(self, quantity: int = 1) -> Evidence:
         self.page.fill("#quantity", str(quantity))
-        self.page.click("#add-to-cart")
-        self.page.wait_for_function("document.getElementById('status').textContent.length > 0")
+
+        # Capture the mutation's actual HTTP response (not the DOM).
+        response_status = None
+        response_version = None
+        response_current_version = None
+        try:
+            with self.page.expect_response(
+                lambda r: r.url.endswith("/api/cart/lines") and r.request.method == "POST",
+                timeout=5000,
+            ) as resp_info:
+                self.page.click("#add-to-cart")
+            response = resp_info.value
+            response_status = response.status
+            body = None
+            try:
+                body = response.json()
+            except Exception:
+                body = None
+            if isinstance(body, dict):
+                response_version = body.get("version")
+                err = body.get("error")
+                if isinstance(err, dict):
+                    response_current_version = err.get("current_version")
+        except Exception:
+            # Transport failure / no matching response: leave status None so the
+            # verifier classifies this as unknown-commit, never a proven rollback.
+            response_status = None
+            response_version = None
+            response_current_version = None
+
+        try:
+            self.page.wait_for_function("document.getElementById('status').textContent.length > 0")
+        except Exception:
+            pass
         status = self.page.text_content("#status").strip()
         version = self.page.text_content("#cart-version").strip()
         return Evidence(
@@ -95,8 +127,29 @@ class BrowserSession:
                 "quantity": quantity,
                 "status": status,
                 "cart_version": version,
+                "response_status": response_status,
+                "response_version": response_version,
+                "response_current_version": response_current_version,
             },
         )
+
+    def seed_line(self, sku: str, quantity: int = 1) -> dict:
+        """Add a customer-owned line through the shared browser session's HTTP
+        request context (same cookie = same cart). Used by the harness for
+        ``seed_lines`` before any task action. No store import; HTTP only.
+        """
+        r = self.context.request.get(f"{self.base_url}/api/cart")
+        if r.status != 200:
+            raise RuntimeError(f"seed failed: GET /api/cart -> HTTP {r.status}")
+        version = r.json()["version"]
+        resp = self.context.request.post(
+            f"{self.base_url}/api/cart/lines",
+            headers={"X-Cart-Version": str(version)},
+            data={"sku": sku, "quantity": quantity},
+        )
+        if resp.status != 200:
+            raise RuntimeError(f"seed failed: POST {sku} -> HTTP {resp.status} {resp.text}")
+        return {"sku": sku, "quantity": quantity, "version": resp.json()["version"]}
 
     # ------------------------------------------------------------------ #
     # Helpers

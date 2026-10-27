@@ -1,9 +1,13 @@
 """Run a scripted cart task end to end against a freshly booted store.
 
 Owns the whole run: boots the store and its control endpoint on ephemeral
-127.0.0.1 ports, applies any requested fault through the control endpoint after
-boot and before the actor starts, runs the actor, prints the evidence log to
-stdout, and shuts everything down.
+127.0.0.1 ports, seeds the customer-owned cart, takes a baseline snapshot,
+builds the intent ledger, applies any requested fault, runs the actor with the
+per-action verification hook, and prints the evidence log and the verification
+report.
+
+Exit codes (verification mode): 0 = COMPLETE, 1 = PARTIAL, 2 = hard error.
+A task with no ``constraints`` key keeps phase-1 behaviour (evidence log only).
 """
 from __future__ import annotations
 
@@ -67,20 +71,46 @@ def _coerce(value: str):
     return value
 
 
+def _declared_additions(spec: dict) -> dict:
+    """The agent's own add amounts, from the actor fields only (never constraints)."""
+    d: dict = {}
+    if "items" in spec:
+        for it in spec["items"]:
+            sku = it.get("target_sku")
+            qty = int(it.get("quantity", 1))
+            if not sku or qty <= 0:
+                raise ValueError(f"invalid item entry: {it!r}")
+            d[sku] = d.get(sku, 0) + qty
+        return d
+    sku = spec.get("target_sku")
+    qty = int(spec.get("quantity", 1))
+    if not sku or qty <= 0:
+        raise ValueError("task spec requires 'target_sku' and a positive 'quantity'")
+    return {sku: qty}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run a scripted CartProof cart task")
     parser.add_argument("--task", required=True, help="path to a task spec JSON")
-    parser.add_argument("--fault", help="fault name to apply after boot, before the actor")
+    parser.add_argument("--fault", help="fault name to apply after baseline, before the actor")
     parser.add_argument("--param", action="append", help="fault param as key=value (repeatable)")
     parser.add_argument("--delay-ms", type=int, help="shorthand for slow-consistency delay_ms")
+    parser.add_argument("--settle-ms", type=int, default=2000, help="settlement deadline (ms)")
     parser.add_argument("--headed", action="store_true", help="run the browser headed")
     parser.add_argument("--db", help="path to the SQLite file (default: var/cartproof.db)")
     args = parser.parse_args(argv)
 
     task_path = Path(args.task).resolve()
     if not task_path.exists():
-        raise SystemExit(f"task file not found: {task_path}")
-    spec = json.loads(task_path.read_text(encoding="utf-8"))
+        print(f"error: task file not found: {task_path}", file=sys.stderr)
+        return 2
+    try:
+        spec = json.loads(task_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        print(f"error: cannot parse task spec: {exc}", file=sys.stderr)
+        return 2
+
+    verification = "constraints" in spec
 
     var_dir = PROJECT_ROOT / "var"
     var_dir.mkdir(exist_ok=True)
@@ -111,18 +141,14 @@ def main(argv: list[str] | None = None) -> int:
     control_url = f"http://127.0.0.1:{control_port}"
 
     try:
-        # Fresh boot: reset then apply the requested fault, all via the control endpoint.
+        # Fresh boot, no fault yet.
         httpx.post(f"{control_url}/_control/reset", timeout=10).raise_for_status()
-        if fault_name:
-            resp = httpx.post(
-                f"{control_url}/_control/fault",
-                json={"name": fault_name, "params": fault_params},
-                timeout=10,
-            )
-            resp.raise_for_status()
 
         from adapter.actions import BrowserSession
+        from adapter.observations import read_api_cart, read_dom_cart
         from agents.scripted_actor import run_actor
+        from core.ledger import ConstraintError, Ledger
+        from core.verify import Verifier, render_report
 
         artifacts = var_dir / "screenshots"
         artifacts.mkdir(exist_ok=True)
@@ -130,16 +156,62 @@ def main(argv: list[str] | None = None) -> int:
 
         session = BrowserSession(store_url, headed=args.headed)
         try:
-            log = run_actor(session, spec, screenshot_path=shot_path)
+            verifier = None
+            ledger = None
+            declared = None
+
+            if verification:
+                try:
+                    # 3. Seed the customer-owned cart through the shared session.
+                    for sl in spec.get("seed_lines") or []:
+                        sku = sl.get("sku")
+                        qty = int(sl.get("quantity", 1))
+                        if not sku or qty <= 0:
+                            raise ValueError(f"invalid seed line: {sl!r}")
+                        session.seed_line(sku, qty)
+
+                    def reader():
+                        return read_dom_cart(session).payload, read_api_cart(session).payload
+
+                    # 4. Baseline snapshot (same session; no fault active yet).
+                    verifier = Verifier(reader, settle_ms=args.settle_ms)
+                    verifier.take_baseline()
+
+                    # 5. Build the ledger (deterministic parse).
+                    ledger = Ledger.build(spec["constraints"])
+                    declared = _declared_additions(spec)
+                except (ConstraintError, ValueError, RuntimeError) as exc:
+                    print(f"error: {exc}", file=sys.stderr)
+                    return 2
+
+            # 6. Apply the requested fault (after seeding + baseline).
+            if fault_name:
+                httpx.post(
+                    f"{control_url}/_control/fault",
+                    json={"name": fault_name, "params": fault_params},
+                    timeout=10,
+                ).raise_for_status()
+
+            # 7. Run the actor with the per-action verification hook.
+            hook = (lambda ev: verifier.on_action(ev.payload)) if verifier is not None else None
+            log = run_actor(session, spec, screenshot_path=shot_path, hook=hook)
+
+            sys.stderr.write(f"store: {store_url}  control: {control_url}\n")
+            if fault_name:
+                sys.stderr.write(f"fault: {fault_name} {fault_params or ''}\n".rstrip() + "\n")
+            _print_agreement(log)
+            print(json.dumps(log, indent=2))
+
+            # 8. Completion tier + verdict report.
+            if verifier is not None:
+                report = verifier.finish(ledger, declared)
+                print(render_report(report))
+                return 0 if report["verdict"] == "COMPLETE" else 1
+
+            print("note: verification was not requested (task has no 'constraints' key)")
+            return 0
         finally:
             session.close()
-
-        sys.stderr.write(f"store: {store_url}  control: {control_url}\n")
-        if fault_name:
-            sys.stderr.write(f"fault: {fault_name} {fault_params or ''}\n".rstrip() + "\n")
-        _print_agreement(log)
-        print(json.dumps(log, indent=2))
-        return 0
     finally:
         stop_server(store_srv, store_thread)
         stop_server(control_srv, control_thread)

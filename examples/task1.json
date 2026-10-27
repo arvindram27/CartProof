@@ -1,5 +1,8 @@
 {
   "product_query": "Hiker Water Bottle",
   "target_sku": "BTL-HIK-500-NAVYBLUE",
-  "quantity": 1
+  "quantity": 1,
+  "constraints": [
+    {"type": "item_quantity", "sku": "BTL-HIK-500-NAVYBLUE", "quantity": 1}
+  ]
 }

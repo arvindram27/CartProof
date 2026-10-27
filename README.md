@@ -76,8 +76,32 @@ stdout, and shuts down.
 
 ## Import rule
 
-Runtime code outside `store/` (the adapter and actor) never imports from
-`store/`; it reaches the store only over HTTP. `tests/` and `harness/` may
+Runtime code outside `store/` (the adapter, actor, and `core/`) never imports
+from `store/`; it reaches the store only over HTTP. `tests/` and `harness/` may
 import the store app factory to boot it, and only they call `/_control/`.
 This is a scoped trust assumption for a local demo harness, not a security
 boundary.
+
+## Verification layer
+
+This phase adds the intent ledger and the action-outcome verification loop
+(`core/`). It verifies and reports; it does **not** correct anything.
+
+- A task JSON with a `constraints` list is verified. Constraints are typed and
+  immutable: `item_quantity` (final absolute quantity of one sku),
+  `count_distinct` (exactly N distinct skus from a named set), and `budget_max`
+  (recomputed cart total in cents). Each constraint carries a state from
+  `unverified`, `confirmed`, `contradicted`, or `unknown`.
+- The verifier orders reads against writes using the store's per-cart
+  `version`. A read below `known_version` is provably stale and never counts as
+  confirmation; a view must be fresh (version equals `known_version`) and
+  settled (three consecutive identical DOM+API rereads) to confirm or contradict
+  a constraint. This version-ordering rule exists only because this owned mock
+  store offers a version contract; on a store without one, uncertain constraints
+  stay `unknown`.
+- `unknown` blocks completion. A run that ends `VERDICT: COMPLETE` has every
+  constraint confirmed *and* the final-minus-baseline delta equal to the
+  declared additions; anything else is `VERDICT: PARTIAL (n/m constraints
+  confirmed)` with the failed checks and anomalies named. Exit codes: 0 for
+  COMPLETE, 1 for PARTIAL, 2 for hard errors.
+
