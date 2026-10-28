@@ -152,7 +152,8 @@ def main(argv: list[str] | None = None) -> int:
         from adapter.observations import read_api_cart, read_dom_cart
         from agents.scripted_actor import run_actor
         from core.ledger import ConstraintError, Ledger
-        from core.recovery import RecoveryController, render_recovery_report
+        from core.recovery import (RecoveryController, attach_raw_pair_recorder,
+                                   establish_recovery_baseline, render_recovery_report)
         from core.verify import Verifier, render_report
 
         artifacts = var_dir / "screenshots"
@@ -193,15 +194,26 @@ def main(argv: list[str] | None = None) -> int:
                         return dom_payload, api_payload
 
                     # 4. Baseline snapshot (same session; no fault active yet).
+                    # Recovery installs its raw-pair recorder BEFORE the first
+                    # baseline read and accepts the baseline only through the
+                    # full-state three-pair proof; verification-only keeps the
+                    # existing aggregate baseline unchanged.
                     verifier = Verifier(reader, settle_ms=args.settle_ms)
-                    verifier.take_baseline()
+                    raw_pairs = None
+                    if args.recover:
+                        raw_pairs = {}
+                        attach_raw_pair_recorder(verifier, raw_pairs)
+                        establish_recovery_baseline(verifier)
+                    else:
+                        verifier.take_baseline()
 
                     # 5. Build the ledger (deterministic parse).
                     ledger = Ledger.build(spec["constraints"])
                     declared = _declared_additions(spec)
                     if args.recover:
                         controller = RecoveryController(
-                            verifier, session, ledger, declared, verifier.baseline)
+                            verifier, session, ledger, declared, verifier.baseline,
+                            raw_pairs=raw_pairs)
                 except (ConstraintError, ValueError, RuntimeError) as exc:
                     print(f"error: {exc}", file=sys.stderr)
                     return 2

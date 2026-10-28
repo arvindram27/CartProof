@@ -148,24 +148,38 @@ class Verifier:
         return self.baseline
 
     def settle(self, known_version: Optional[int] = None, deadline_ms: Optional[int] = None,
-               phase: str = "recovery"):
+               phase: str = "recovery", coherence=None, signature=None,
+               on_incoherent=None):
         """Public settlement entry used by the recovery controller.
 
-        Wraps the settlement machinery without exposing private internals.
-        Returns ``{"status", "view", "provenance"}`` where ``view`` is a fresh
+        Wraps the settlement machinery without exposing private internals. With
+        ``coherence``/``signature`` unset it uses the closed SKU/quantity/total
+        rules; recovery passes full-state comparators. Returns ``{"status",
+        "view", "dom", "api", "provenance", "sample_ids"}`` where ``view`` is a
         settled snapshot ``{version, lines, total_cents}`` only when ``status``
-        is ``"settled"``.
+        is ``"settled"``, and ``dom``/``api`` are the raw last pair.
+
+        ``on_incoherent`` is an optional recovery-only diagnostic hook invoked
+        with ``(kind, dom, api, e_dom, e_api)`` for a fresh incoherent pair. It
+        never changes the settlement outcome or the returned fields.
         """
         kv = self.known_version if known_version is None else known_version
-        status, dom, api = self._sample(kv, deadline_ms=deadline_ms, phase=phase)
+        start = len(self.samples)
+        status, dom, api = self._sample(kv, deadline_ms=deadline_ms, phase=phase,
+                                        coherence=coherence, signature=signature,
+                                        on_incoherent=on_incoherent)
+        sample_ids = [s["seq"] for s in self.samples[start:]]
         if status == "settled":
             view = {
                 "version": api["version"],
                 "lines": api["lines"],
                 "total_cents": api["total_cents"],
             }
-            return {"status": "settled", "view": view, "provenance": tuple(self._settled_provenance)}
-        return {"status": status, "view": None, "provenance": ()}
+            return {"status": "settled", "view": view, "dom": dom, "api": api,
+                    "provenance": tuple(self._settled_provenance),
+                    "sample_ids": sample_ids}
+        return {"status": status, "view": None, "dom": dom, "api": api,
+                "provenance": (), "sample_ids": sample_ids}
 
     # ------------------------------------------------------------------ #
     # Per-action version tracking + anomaly detection
@@ -330,7 +344,11 @@ class Verifier:
     # Settlement sampling
     # ------------------------------------------------------------------ #
     def _sample(self, known_version: Optional[int], deadline_ms: Optional[int] = None,
-                phase: str = "completion"):
+                phase: str = "completion", coherence=None, signature=None,
+                on_incoherent=None):
+        coh = coherence or _coherent
+        sig_fn = signature or (lambda dv, api: (dv, _norm_lines(api.get("lines") or []),
+                                                api.get("total_cents")))
         deadline = self.now_ms_fn() + (deadline_ms if deadline_ms is not None else self.settle_ms)
         self._settled_provenance = ()  # clear any prior attempt's provenance
         last_sig = None
@@ -375,9 +393,22 @@ class Verifier:
                 self.sleep_ms_fn(self.interval_ms)
                 continue
 
-            ok, kind = _coherent(dom, api)
+            ok, kind = coh(dom, api)
             if not ok:
-                if kind == "version":
+                if kind == "arithmetic":
+                    # Recovery-only category: DOM and API agree with each other
+                    # but not with line arithmetic. Only a version-current,
+                    # non-late pair is fresh enough to diagnose: a below-known
+                    # read is provably stale and must not become malformed
+                    # evidence or cite itself as an arithmetic inconsistency.
+                    lower = _min_version(dom, api)
+                    is_stale = (known_version is not None and lower is not None
+                                and lower < known_version)
+                    if not late and not is_stale:
+                        saw_malformed = True
+                        if on_incoherent is not None:
+                            on_incoherent(kind, dom, api, e_dom, e_api)
+                elif kind == "version":
                     lower = _min_version(dom, api)
                     is_stale = (known_version is not None and lower is not None
                                 and lower < known_version)
@@ -393,7 +424,7 @@ class Verifier:
             else:
                 dv = _version(api)
                 last_coherent_version = dv
-                sig = (dv, _norm_lines(api.get("lines") or []), api.get("total_cents"))
+                sig = sig_fn(dv, api)
                 if known_version is not None and dv is not None and dv < known_version:
                     # provably stale: never accumulates settlement
                     streak = 0
