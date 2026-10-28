@@ -96,6 +96,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--param", action="append", help="fault param as key=value (repeatable)")
     parser.add_argument("--delay-ms", type=int, help="shorthand for slow-consistency delay_ms")
     parser.add_argument("--settle-ms", type=int, default=2000, help="settlement deadline (ms)")
+    parser.add_argument("--recover", action="store_true", help="opt-in bounded recovery")
     parser.add_argument("--headed", action="store_true", help="run the browser headed")
     parser.add_argument("--db", help="path to the SQLite file (default: var/cartproof.db)")
     args = parser.parse_args(argv)
@@ -111,6 +112,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     verification = "constraints" in spec
+    if args.recover and not verification:
+        print("error: --recover requires a task with a 'constraints' key", file=sys.stderr)
+        return 2
 
     var_dir = PROJECT_ROOT / "var"
     var_dir.mkdir(exist_ok=True)
@@ -148,6 +152,7 @@ def main(argv: list[str] | None = None) -> int:
         from adapter.observations import read_api_cart, read_dom_cart
         from agents.scripted_actor import run_actor
         from core.ledger import ConstraintError, Ledger
+        from core.recovery import RecoveryController, render_recovery_report
         from core.verify import Verifier, render_report
 
         artifacts = var_dir / "screenshots"
@@ -159,6 +164,7 @@ def main(argv: list[str] | None = None) -> int:
             verifier = None
             ledger = None
             declared = None
+            controller = None
 
             if verification:
                 try:
@@ -193,6 +199,9 @@ def main(argv: list[str] | None = None) -> int:
                     # 5. Build the ledger (deterministic parse).
                     ledger = Ledger.build(spec["constraints"])
                     declared = _declared_additions(spec)
+                    if args.recover:
+                        controller = RecoveryController(
+                            verifier, session, ledger, declared, verifier.baseline)
                 except (ConstraintError, ValueError, RuntimeError) as exc:
                     print(f"error: {exc}", file=sys.stderr)
                     return 2
@@ -205,8 +214,24 @@ def main(argv: list[str] | None = None) -> int:
                     timeout=10,
                 ).raise_for_status()
 
-            # 7. Run the actor with the per-action verification hook.
-            hook = (lambda ev: verifier.on_action(ev.payload)) if verifier is not None else None
+            # 7. Run the actor with the per-action verification/recovery hook.
+            if controller is not None:
+                def hook(event):
+                    kind = event.get("kind")
+                    if kind == "before_add":
+                        return controller.before_add(event)
+                    if kind == "pre_add":
+                        return controller.pre_add(event)
+                    if kind == "after_add":
+                        return controller.after_add(event)
+                    return None
+            elif verifier is not None:
+                def hook(event):
+                    if event.get("kind") == "after_add":
+                        verifier.on_action(event["add"]["payload"])
+                    return None
+            else:
+                hook = None
             log = run_actor(session, spec, screenshot_path=shot_path, hook=hook)
 
             sys.stderr.write(f"store: {store_url}  control: {control_url}\n")
@@ -216,6 +241,10 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(log, indent=2))
 
             # 8. Completion tier + verdict report.
+            if controller is not None:
+                report, verdict = controller.complete()
+                print(render_recovery_report(report))
+                return 0 if verdict == "COMPLETE" else 1
             if verifier is not None:
                 report = verifier.finish(ledger, declared)
                 print(render_report(report))

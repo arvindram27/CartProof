@@ -147,6 +147,26 @@ class Verifier:
         self.known_version = self.baseline["version"]
         return self.baseline
 
+    def settle(self, known_version: Optional[int] = None, deadline_ms: Optional[int] = None,
+               phase: str = "recovery"):
+        """Public settlement entry used by the recovery controller.
+
+        Wraps the settlement machinery without exposing private internals.
+        Returns ``{"status", "view", "provenance"}`` where ``view`` is a fresh
+        settled snapshot ``{version, lines, total_cents}`` only when ``status``
+        is ``"settled"``.
+        """
+        kv = self.known_version if known_version is None else known_version
+        status, dom, api = self._sample(kv, deadline_ms=deadline_ms, phase=phase)
+        if status == "settled":
+            view = {
+                "version": api["version"],
+                "lines": api["lines"],
+                "total_cents": api["total_cents"],
+            }
+            return {"status": "settled", "view": view, "provenance": tuple(self._settled_provenance)}
+        return {"status": status, "view": None, "provenance": ()}
+
     # ------------------------------------------------------------------ #
     # Per-action version tracking + anomaly detection
     # ------------------------------------------------------------------ #

@@ -105,3 +105,41 @@ This phase adds the intent ledger and the action-outcome verification loop
   confirmed)` with the failed checks and anomalies named. Exit codes: 0 for
   COMPLETE, 1 for PARTIAL, 2 for hard errors.
 
+## Recovery layer (opt-in)
+
+`--recover` turns on bounded, deterministic correction for the owned mock store.
+Without it, behaviour is unchanged. It corrects only a proven, safely
+attributable mismatch; it never repairs a total or makes uncertain evidence
+agree.
+
+- Usage: `python -m harness.run_task --task examples/task1.json --fault
+  quantity-drift --recover`. `--recover` with no `constraints` key is a hard
+  configuration error.
+- Supported corrections: a proven wrong variant (remove the owned wrong line,
+  then re-add the intended SKU — two separately guarded, non-atomic steps), a
+  proven excess quantity on a newly created line (PATCH to the intended absolute
+  quantity), and a proven no-commit silent drop (one bounded retry of the same
+  intended add). Timeout / 5xx / malformed response is `unknown_commit`, never a
+  silent drop.
+- Conservative ownership: automatic quantity reduction or removal applies only
+  to a line absent from the original baseline *and* from the immediately
+  preceding snapshot, newly observed after one tracked action, with a stable
+  line ID and an exact explained delta. A merge into a seeded/pre-existing SKU
+  stops with `ownership_uncertain` — some repairable-looking merged carts stay
+  `PARTIAL` by design. Baseline lines, quantities, SKUs and unit prices, and all
+  unrelated lines, are preserved.
+- Hard bounds: at most 2 correction plans per original target and 4 attempted
+  corrective HTTP mutations per run; a plan is not started unless its remaining
+  steps fit both caps. External mutation, unknown commit, ambiguous ownership,
+  unresolved diagnosis, cap exhaustion, a rejected correction, a 409 version
+  conflict, stale totals, DOM/API conflict and deadline expiry all stop the run.
+- Completion: `COMPLETE` requires every original constraint confirmed by a final
+  fresh settled view, the final-minus-original-baseline net delta equal to the
+  original declared additions, all protected items preserved, and no blocking
+  incident. Historical failures remain visible even after a successful recovery.
+- Scope: this is the owned mock store only. A transient fault fixture that is
+  cleared between the initial add and the corrective add recovers; a persistent
+  fault that remains active on every write ends `PARTIAL` — this is not a claim
+  of real-merchant reliability or model-agent improvement.
+
+

@@ -5,8 +5,13 @@ Takes a task spec (either ``product_query``/``target_sku``/``quantity``, or an
 evidence log. No randomness, no retries, no checkout.
 
 With ``hook=None`` this behaves exactly as in phase 1. When a ``hook`` is
-supplied it is invoked after every cart-mutating action (``add_to_cart``) with
-that action's ``Evidence``.
+supplied it is invoked at three points per item and its returned
+``{"stop": bool, "reason": str}`` result is honoured:
+
+- ``before_add`` (before the page is re-opened) - the verifier settles the
+  before-snapshot here;
+- ``pre_add`` (after open+select, before the POST) - page version validation;
+- ``after_add`` (after the mutating add) - diagnosis/recovery.
 """
 from __future__ import annotations
 
@@ -39,10 +44,19 @@ def run_actor(session: BrowserSession, spec: dict[str, Any],
               screenshot_path: str | None = None, hook=None) -> list[dict[str, Any]]:
     log: list[dict[str, Any]] = []
 
-    for item in _item_specs(spec):
+    for index, item in enumerate(_item_specs(spec)):
         query = item["product_query"]
         target_sku = item["target_sku"]
         quantity = item["quantity"]
+        action_id = f"add-{index}"
+
+        # before_add: let the verifier settle the before-snapshot first
+        # (settlement navigates to /cart, so the page is restored after).
+        if hook is not None:
+            r = hook({"kind": "before_add", "action_id": action_id,
+                      "item": {"index": index, "sku": target_sku, "quantity": quantity}})
+            if r and r.get("stop"):
+                break
 
         search_ev = session.search(query)
         log.append(search_ev.to_dict())
@@ -58,10 +72,23 @@ def run_actor(session: BrowserSession, spec: dict[str, Any],
         select_ev = session.select_variant(target_sku)
         log.append(select_ev.to_dict())
 
-        add_ev = session.add_to_cart(quantity)
-        log.append(add_ev.to_dict())
+        item_ctx = {"index": index, "product_id": product_id,
+                    "sku": target_sku, "quantity": quantity}
+
         if hook is not None:
-            hook(add_ev)
+            r = hook({"kind": "pre_add", "action_id": action_id, "item": item_ctx,
+                      "open": open_ev.to_dict()})
+            if r and r.get("stop"):
+                break
+
+        add_ev = session.add_to_cart(quantity, sku=target_sku)
+        log.append(add_ev.to_dict())
+
+        if hook is not None:
+            r = hook({"kind": "after_add", "action_id": action_id, "item": item_ctx,
+                      "add": add_ev.to_dict()})
+            if r and r.get("stop"):
+                break
 
     dom_ev = read_dom_cart(session)
     log.append(dom_ev.to_dict())
