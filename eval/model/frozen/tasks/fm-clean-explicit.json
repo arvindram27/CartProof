@@ -1,0 +1,29 @@
+{
+  "task_id": "fm-clean-explicit",
+  "task_class": "resolvable",
+  "fault_class": "clean",
+  "fault": {
+    "name": null,
+    "params": {}
+  },
+  "runtime": {
+    "request_text": "Add 1 x BTL-SPT-24-CLEAR.",
+    "seed_lines": []
+  },
+  "expected": {
+    "lines": {
+      "BTL-SPT-24-CLEAR": 1
+    }
+  },
+  "expected_interpretation": {
+    "items": [
+      {
+        "sku": "BTL-SPT-24-CLEAR",
+        "quantity": 1
+      }
+    ],
+    "budget_max_cents": null,
+    "substitution_allowed": false
+  },
+  "expected_outcome_category": "proceed"
+}

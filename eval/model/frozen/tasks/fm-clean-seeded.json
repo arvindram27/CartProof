@@ -1,0 +1,35 @@
+{
+  "task_id": "fm-clean-seeded",
+  "task_class": "resolvable",
+  "fault_class": "clean",
+  "fault": {
+    "name": null,
+    "params": {}
+  },
+  "runtime": {
+    "request_text": "Add 1 x BTL-GRW-1L-STEEL.",
+    "seed_lines": [
+      {
+        "sku": "BTL-GLS-400-CLEAR",
+        "quantity": 1
+      }
+    ]
+  },
+  "expected": {
+    "lines": {
+      "BTL-GLS-400-CLEAR": 1,
+      "BTL-GRW-1L-STEEL": 1
+    }
+  },
+  "expected_interpretation": {
+    "items": [
+      {
+        "sku": "BTL-GRW-1L-STEEL",
+        "quantity": 1
+      }
+    ],
+    "budget_max_cents": null,
+    "substitution_allowed": false
+  },
+  "expected_outcome_category": "proceed"
+}

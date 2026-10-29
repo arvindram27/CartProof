@@ -1,0 +1,31 @@
+{
+  "task_id": "m-fault-slow",
+  "task_class": "resolvable",
+  "fault_class": "slow-consistency",
+  "fault": {
+    "name": "slow-consistency",
+    "params": {
+      "delay_ms": 500
+    }
+  },
+  "runtime": {
+    "request_text": "Add 1 x BTL-HIK-500-NAVYBLUE.",
+    "seed_lines": []
+  },
+  "expected": {
+    "lines": {
+      "BTL-HIK-500-NAVYBLUE": 1
+    }
+  },
+  "expected_interpretation": {
+    "items": [
+      {
+        "sku": "BTL-HIK-500-NAVYBLUE",
+        "quantity": 1
+      }
+    ],
+    "budget_max_cents": null,
+    "substitution_allowed": false
+  },
+  "expected_outcome_category": "proceed"
+}

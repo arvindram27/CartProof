@@ -1,0 +1,29 @@
+{
+  "task_id": "m-fault-dom-api",
+  "task_class": "resolvable",
+  "fault_class": "dom-api-mismatch",
+  "fault": {
+    "name": "dom-api-mismatch",
+    "params": {}
+  },
+  "runtime": {
+    "request_text": "Add 1 x BTL-HIK-500-NAVYBLUE.",
+    "seed_lines": []
+  },
+  "expected": {
+    "lines": {
+      "BTL-HIK-500-NAVYBLUE": 1
+    }
+  },
+  "expected_interpretation": {
+    "items": [
+      {
+        "sku": "BTL-HIK-500-NAVYBLUE",
+        "quantity": 1
+      }
+    ],
+    "budget_max_cents": null,
+    "substitution_allowed": false
+  },
+  "expected_outcome_category": "proceed"
+}

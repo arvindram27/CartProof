@@ -1,0 +1,29 @@
+{
+  "task_id": "m-clean-qty-word",
+  "task_class": "resolvable",
+  "fault_class": "clean",
+  "fault": {
+    "name": null,
+    "params": {}
+  },
+  "runtime": {
+    "request_text": "Add two Kids Bottle in pink.",
+    "seed_lines": []
+  },
+  "expected": {
+    "lines": {
+      "BTL-KID-350-PINK": 2
+    }
+  },
+  "expected_interpretation": {
+    "items": [
+      {
+        "sku": "BTL-KID-350-PINK",
+        "quantity": 2
+      }
+    ],
+    "budget_max_cents": null,
+    "substitution_allowed": false
+  },
+  "expected_outcome_category": "proceed"
+}

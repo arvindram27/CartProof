@@ -1,0 +1,17 @@
+{
+  "suite": "model-frozen",
+  "task_files": [
+    "tasks/fm-clean-explicit.json",
+    "tasks/fm-clean-attribute.json",
+    "tasks/fm-clean-multi.json",
+    "tasks/fm-clean-seeded.json",
+    "tasks/fm-fault-silent-drop.json",
+    "tasks/fm-fault-wrong-variant.json",
+    "tasks/fm-fault-quantity-drift.json",
+    "tasks/fm-fault-stale-total.json",
+    "tasks/fm-fault-external.json",
+    "tasks/fm-under-ambiguous.json",
+    "tasks/fm-under-generic.json",
+    "tasks/fm-under-vague.json"
+  ]
+}

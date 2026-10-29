@@ -1,0 +1,31 @@
+{
+  "task_id": "fm-fault-quantity-drift",
+  "task_class": "resolvable",
+  "fault_class": "quantity-drift",
+  "fault": {
+    "name": "quantity-drift",
+    "params": {
+      "delta": 1
+    }
+  },
+  "runtime": {
+    "request_text": "Add 1 x BTL-KID-350-SKY.",
+    "seed_lines": []
+  },
+  "expected": {
+    "lines": {
+      "BTL-KID-350-SKY": 1
+    }
+  },
+  "expected_interpretation": {
+    "items": [
+      {
+        "sku": "BTL-KID-350-SKY",
+        "quantity": 1
+      }
+    ],
+    "budget_max_cents": null,
+    "substitution_allowed": false
+  },
+  "expected_outcome_category": "proceed"
+}

@@ -1,0 +1,34 @@
+{
+  "task_id": "m-clean-multi",
+  "task_class": "resolvable",
+  "fault_class": "clean",
+  "fault": {
+    "name": null,
+    "params": {}
+  },
+  "runtime": {
+    "request_text": "Add 1 x BTL-HIK-500-NAVYBLUE and add 1 x BTL-TMB-12-SLATE.",
+    "seed_lines": []
+  },
+  "expected": {
+    "lines": {
+      "BTL-HIK-500-NAVYBLUE": 1,
+      "BTL-TMB-12-SLATE": 1
+    }
+  },
+  "expected_interpretation": {
+    "items": [
+      {
+        "sku": "BTL-HIK-500-NAVYBLUE",
+        "quantity": 1
+      },
+      {
+        "sku": "BTL-TMB-12-SLATE",
+        "quantity": 1
+      }
+    ],
+    "budget_max_cents": null,
+    "substitution_allowed": false
+  },
+  "expected_outcome_category": "proceed"
+}

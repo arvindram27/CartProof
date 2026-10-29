@@ -1,0 +1,29 @@
+{
+  "task_id": "m-under-generic",
+  "task_class": "underdetermined",
+  "fault_class": "clean",
+  "fault": {
+    "name": null,
+    "params": {}
+  },
+  "runtime": {
+    "request_text": "Add a water bottle.",
+    "seed_lines": [
+      {
+        "sku": "BTL-HIK-500-NAVY",
+        "quantity": 1
+      }
+    ]
+  },
+  "expected": {
+    "lines": {
+      "BTL-HIK-500-NAVY": 1
+    }
+  },
+  "expected_interpretation": {
+    "items": [],
+    "budget_max_cents": null,
+    "substitution_allowed": false
+  },
+  "expected_outcome_category": "clarify/abstain"
+}

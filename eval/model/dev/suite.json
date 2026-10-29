@@ -1,0 +1,22 @@
+{
+  "suite": "model-dev",
+  "task_files": [
+    "tasks/m-clean-explicit-sku.json",
+    "tasks/m-clean-attribute.json",
+    "tasks/m-clean-multi.json",
+    "tasks/m-clean-seeded.json",
+    "tasks/m-clean-qty-word.json",
+    "tasks/m-clean-budget.json",
+    "tasks/m-budget-capped.json",
+    "tasks/m-fault-silent-drop.json",
+    "tasks/m-fault-wrong-variant.json",
+    "tasks/m-fault-quantity-drift.json",
+    "tasks/m-fault-stale-total.json",
+    "tasks/m-fault-dom-api.json",
+    "tasks/m-fault-slow.json",
+    "tasks/m-under-ambiguous-size.json",
+    "tasks/m-under-generic.json",
+    "tasks/m-under-shoe.json",
+    "tasks/m-under-vague-qty.json"
+  ]
+}

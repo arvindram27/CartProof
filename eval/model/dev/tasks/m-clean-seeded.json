@@ -1,0 +1,35 @@
+{
+  "task_id": "m-clean-seeded",
+  "task_class": "resolvable",
+  "fault_class": "clean",
+  "fault": {
+    "name": null,
+    "params": {}
+  },
+  "runtime": {
+    "request_text": "Add 1 x BTL-HIK-750-STEEL.",
+    "seed_lines": [
+      {
+        "sku": "BTL-HIK-500-NAVY",
+        "quantity": 1
+      }
+    ]
+  },
+  "expected": {
+    "lines": {
+      "BTL-HIK-500-NAVY": 1,
+      "BTL-HIK-750-STEEL": 1
+    }
+  },
+  "expected_interpretation": {
+    "items": [
+      {
+        "sku": "BTL-HIK-750-STEEL",
+        "quantity": 1
+      }
+    ],
+    "budget_max_cents": null,
+    "substitution_allowed": false
+  },
+  "expected_outcome_category": "proceed"
+}

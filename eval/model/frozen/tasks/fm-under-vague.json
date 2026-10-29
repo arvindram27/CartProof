@@ -1,0 +1,22 @@
+{
+  "task_id": "fm-under-vague",
+  "task_class": "underdetermined",
+  "fault_class": "clean",
+  "fault": {
+    "name": null,
+    "params": {}
+  },
+  "runtime": {
+    "request_text": "Add some Sports Squeeze.",
+    "seed_lines": []
+  },
+  "expected": {
+    "lines": {}
+  },
+  "expected_interpretation": {
+    "items": [],
+    "budget_max_cents": null,
+    "substitution_allowed": false
+  },
+  "expected_outcome_category": "clarify/abstain"
+}

@@ -1,0 +1,13 @@
+# eval/model/frozen MANIFEST - SHA-256 of frozen task files (recorded after design finalization, before any result exposure)
+cc47334bd41377fcef316d649bb18791731fd1a3a7d7dd4fcb33272b748b5c96  tasks/fm-clean-explicit.json
+ce73364bdced982601371daa6889efa50de119c9937d0db204dd75e058b7f28e  tasks/fm-clean-attribute.json
+835d0fbdf161c6fbbb114443f4b540de42146af7e913c12c910020f93046f8a8  tasks/fm-clean-multi.json
+20d7b579dbf809ed748a101920a8f6c0e6017449f0ca14e78a73bcc4694ac806  tasks/fm-clean-seeded.json
+eae2fdfffeb1f1472d829584916b876b54037aa183761a4814490f1afebe783c  tasks/fm-fault-silent-drop.json
+51123259b1da99d9e95b8b49dfb4c3f11043bc640ecf202b8725b4addc689de1  tasks/fm-fault-wrong-variant.json
+dfc5d07d96f228eb9038276c9cfa501eac2ea76fb25ffe7efda76510d41a0436  tasks/fm-fault-quantity-drift.json
+4844c6b9d47cf1eaab8dd7e21811c920ddae13c89e3e4eef517a5b0421888f42  tasks/fm-fault-stale-total.json
+fada1120d9b473b92da759f965a6dda37aaf4d1386c92c5bcbf675291196011b  tasks/fm-fault-external.json
+e6abdcab7f0411e3b45a216a482fcf22dc4e44333446e91c0b028ede9e510fef  tasks/fm-under-ambiguous.json
+4dce2d4d3c83d6631f7b2f7caa7a19022d4546f96e2338516145f40edbb5cd4b  tasks/fm-under-generic.json
+65257f128d4ffc9dc43e98311d290be524c3e051c469c7f66ceb6818e2421a22  tasks/fm-under-vague.json

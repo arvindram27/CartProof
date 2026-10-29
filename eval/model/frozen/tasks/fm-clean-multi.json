@@ -1,0 +1,34 @@
+{
+  "task_id": "fm-clean-multi",
+  "task_class": "resolvable",
+  "fault_class": "clean",
+  "fault": {
+    "name": null,
+    "params": {}
+  },
+  "runtime": {
+    "request_text": "Add 1 x BTL-GLS-400-CLEAR and add 1 x SHT-POL-M-FOREST.",
+    "seed_lines": []
+  },
+  "expected": {
+    "lines": {
+      "BTL-GLS-400-CLEAR": 1,
+      "SHT-POL-M-FOREST": 1
+    }
+  },
+  "expected_interpretation": {
+    "items": [
+      {
+        "sku": "BTL-GLS-400-CLEAR",
+        "quantity": 1
+      },
+      {
+        "sku": "SHT-POL-M-FOREST",
+        "quantity": 1
+      }
+    ],
+    "budget_max_cents": null,
+    "substitution_allowed": false
+  },
+  "expected_outcome_category": "proceed"
+}

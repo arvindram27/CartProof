@@ -1,0 +1,2604 @@
+{
+  "m-clean-explicit-sku": {
+    "MA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "MB": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "MC": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "CA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        },
+        {
+          "payload": {
+            "action": "read_cart"
+          }
+        },
+        {
+          "payload": {
+            "action": "finish"
+          }
+        },
+        {
+          "payload": {
+            "declaration": "COMPLETE",
+            "rationale": "observed cart matches intent"
+          }
+        }
+      ]
+    }
+  },
+  "m-clean-attribute": {
+    "MA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-750-STEEL",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-750-STEEL"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-750-STEEL",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "MB": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-750-STEEL",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-750-STEEL"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-750-STEEL",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "MC": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-750-STEEL",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-750-STEEL"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-750-STEEL",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "CA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-750-STEEL",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-750-STEEL"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-750-STEEL",
+            "quantity": 1
+          }
+        },
+        {
+          "payload": {
+            "action": "read_cart"
+          }
+        },
+        {
+          "payload": {
+            "action": "finish"
+          }
+        },
+        {
+          "payload": {
+            "declaration": "COMPLETE",
+            "rationale": "observed cart matches intent"
+          }
+        }
+      ]
+    }
+  },
+  "m-clean-multi": {
+    "MA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              },
+              {
+                "sku": "BTL-TMB-12-SLATE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-tumbler"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-TMB-12-SLATE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-TMB-12-SLATE",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "MB": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              },
+              {
+                "sku": "BTL-TMB-12-SLATE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-tumbler"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-TMB-12-SLATE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-TMB-12-SLATE",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "MC": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              },
+              {
+                "sku": "BTL-TMB-12-SLATE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-tumbler"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-TMB-12-SLATE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-TMB-12-SLATE",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "CA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              },
+              {
+                "sku": "BTL-TMB-12-SLATE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-tumbler"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-TMB-12-SLATE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-TMB-12-SLATE",
+            "quantity": 1
+          }
+        },
+        {
+          "payload": {
+            "action": "read_cart"
+          }
+        },
+        {
+          "payload": {
+            "action": "finish"
+          }
+        },
+        {
+          "payload": {
+            "declaration": "COMPLETE",
+            "rationale": "observed cart matches intent"
+          }
+        }
+      ]
+    }
+  },
+  "m-clean-seeded": {
+    "MA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-750-STEEL",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-750-STEEL"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-750-STEEL",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "MB": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-750-STEEL",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-750-STEEL"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-750-STEEL",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "MC": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-750-STEEL",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-750-STEEL"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-750-STEEL",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "CA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-750-STEEL",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-750-STEEL"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-750-STEEL",
+            "quantity": 1
+          }
+        },
+        {
+          "payload": {
+            "action": "read_cart"
+          }
+        },
+        {
+          "payload": {
+            "action": "finish"
+          }
+        },
+        {
+          "payload": {
+            "declaration": "COMPLETE",
+            "rationale": "observed cart matches intent"
+          }
+        }
+      ]
+    }
+  },
+  "m-clean-qty-word": {
+    "MA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-KID-350-PINK",
+                "quantity": 2
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-kids"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-KID-350-PINK"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-KID-350-PINK",
+            "quantity": 2
+          }
+        }
+      ]
+    },
+    "MB": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-KID-350-PINK",
+                "quantity": 2
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-kids"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-KID-350-PINK"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-KID-350-PINK",
+            "quantity": 2
+          }
+        }
+      ]
+    },
+    "MC": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-KID-350-PINK",
+                "quantity": 2
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-kids"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-KID-350-PINK"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-KID-350-PINK",
+            "quantity": 2
+          }
+        }
+      ]
+    },
+    "CA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-KID-350-PINK",
+                "quantity": 2
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-kids"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-KID-350-PINK"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-KID-350-PINK",
+            "quantity": 2
+          }
+        },
+        {
+          "payload": {
+            "action": "read_cart"
+          }
+        },
+        {
+          "payload": {
+            "action": "finish"
+          }
+        },
+        {
+          "payload": {
+            "declaration": "COMPLETE",
+            "rationale": "observed cart matches intent"
+          }
+        }
+      ]
+    }
+  },
+  "m-clean-budget": {
+    "MA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-THR-500-BLACK",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": 5000,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-thermo"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-THR-500-BLACK"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-THR-500-BLACK",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "MB": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-THR-500-BLACK",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": 5000,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-thermo"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-THR-500-BLACK"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-THR-500-BLACK",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "MC": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-THR-500-BLACK",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": 5000,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-thermo"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-THR-500-BLACK"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-THR-500-BLACK",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "CA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-THR-500-BLACK",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": 5000,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-thermo"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-THR-500-BLACK"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-THR-500-BLACK",
+            "quantity": 1
+          }
+        },
+        {
+          "payload": {
+            "action": "read_cart"
+          }
+        },
+        {
+          "payload": {
+            "action": "finish"
+          }
+        },
+        {
+          "payload": {
+            "declaration": "COMPLETE",
+            "rationale": "observed cart matches intent"
+          }
+        }
+      ]
+    }
+  },
+  "m-budget-capped": {
+    "MA": {
+      "budget": {
+        "token_budget": 1
+      },
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        }
+      ]
+    },
+    "CA": {
+      "budget": {
+        "token_budget": 1
+      },
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        }
+      ]
+    },
+    "MB": {
+      "budget": {
+        "token_budget": 1
+      },
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        }
+      ]
+    },
+    "MC": {
+      "budget": {
+        "token_budget": 1
+      },
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        }
+      ]
+    }
+  },
+  "m-fault-silent-drop": {
+    "MA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "MB": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "MC": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "CA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        },
+        {
+          "payload": {
+            "action": "read_cart"
+          }
+        },
+        {
+          "payload": {
+            "action": "finish"
+          }
+        },
+        {
+          "payload": {
+            "declaration": "PARTIAL",
+            "rationale": "observed cart does not match intent"
+          }
+        }
+      ]
+    }
+  },
+  "m-fault-wrong-variant": {
+    "MA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "MB": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "MC": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "CA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        },
+        {
+          "payload": {
+            "action": "read_cart"
+          }
+        },
+        {
+          "payload": {
+            "action": "finish"
+          }
+        },
+        {
+          "payload": {
+            "declaration": "PARTIAL",
+            "rationale": "observed cart does not match intent"
+          }
+        }
+      ]
+    }
+  },
+  "m-fault-quantity-drift": {
+    "MA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "MB": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "MC": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "CA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        },
+        {
+          "payload": {
+            "action": "read_cart"
+          }
+        },
+        {
+          "payload": {
+            "action": "set_line_quantity",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        },
+        {
+          "payload": {
+            "action": "read_cart"
+          }
+        },
+        {
+          "payload": {
+            "action": "finish"
+          }
+        },
+        {
+          "payload": {
+            "declaration": "COMPLETE",
+            "rationale": "cart matches intent after correction"
+          }
+        }
+      ]
+    }
+  },
+  "m-fault-stale-total": {
+    "MA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-THR-500-BLACK",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-thermo"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-THR-500-BLACK"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-THR-500-BLACK",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "MB": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-THR-500-BLACK",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-thermo"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-THR-500-BLACK"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-THR-500-BLACK",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "MC": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-THR-500-BLACK",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-thermo"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-THR-500-BLACK"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-THR-500-BLACK",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "CA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-THR-500-BLACK",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-thermo"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-THR-500-BLACK"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-THR-500-BLACK",
+            "quantity": 1
+          }
+        },
+        {
+          "payload": {
+            "action": "read_cart"
+          }
+        },
+        {
+          "payload": {
+            "action": "finish"
+          }
+        },
+        {
+          "payload": {
+            "declaration": "COMPLETE",
+            "rationale": "observed cart matches intent"
+          }
+        }
+      ]
+    }
+  },
+  "m-fault-dom-api": {
+    "MA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "MB": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "MC": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "CA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        },
+        {
+          "payload": {
+            "action": "read_cart"
+          }
+        },
+        {
+          "payload": {
+            "action": "finish"
+          }
+        },
+        {
+          "payload": {
+            "declaration": "PARTIAL",
+            "rationale": "observed cart does not match intent"
+          }
+        }
+      ]
+    }
+  },
+  "m-fault-slow": {
+    "MA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "MB": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "MC": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    "CA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        },
+        {
+          "payload": {
+            "action": "search"
+          }
+        },
+        {
+          "payload": {
+            "action": "open_product",
+            "product_id": "bottle-hiker"
+          }
+        },
+        {
+          "payload": {
+            "action": "select_variant",
+            "sku": "BTL-HIK-500-NAVYBLUE"
+          }
+        },
+        {
+          "payload": {
+            "action": "add_to_cart",
+            "sku": "BTL-HIK-500-NAVYBLUE",
+            "quantity": 1
+          }
+        },
+        {
+          "payload": {
+            "action": "read_cart"
+          }
+        },
+        {
+          "payload": {
+            "action": "finish"
+          }
+        },
+        {
+          "payload": {
+            "declaration": "COMPLETE",
+            "rationale": "observed cart matches intent"
+          }
+        }
+      ]
+    }
+  },
+  "m-under-ambiguous-size": {
+    "MA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        }
+      ]
+    },
+    "CA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        }
+      ]
+    },
+    "MB": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        }
+      ]
+    },
+    "MC": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        }
+      ]
+    }
+  },
+  "m-under-generic": {
+    "MA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        }
+      ]
+    },
+    "CA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        }
+      ]
+    },
+    "MB": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        }
+      ]
+    },
+    "MC": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        }
+      ]
+    }
+  },
+  "m-under-shoe": {
+    "MA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        }
+      ]
+    },
+    "CA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        }
+      ]
+    },
+    "MB": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        }
+      ]
+    },
+    "MC": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        }
+      ]
+    }
+  },
+  "m-under-vague-qty": {
+    "MA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        }
+      ]
+    },
+    "CA": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        }
+      ]
+    },
+    "MB": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        }
+      ]
+    },
+    "MC": {
+      "responses": [
+        {
+          "payload": {
+            "items": [
+              {
+                "sku": "BTL-HIK-500-NAVYBLUE",
+                "quantity": 1
+              }
+            ],
+            "budget_max_cents": null,
+            "substitution_allowed": false
+          }
+        }
+      ]
+    }
+  }
+}
