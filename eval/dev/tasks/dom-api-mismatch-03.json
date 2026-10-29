@@ -1,0 +1,50 @@
+{
+  "task_id": "dom-api-mismatch-03",
+  "fault_class": "dom-api-mismatch",
+  "fault": {
+    "name": "dom-api-mismatch",
+    "params": {}
+  },
+  "runtime": {
+    "items": [
+      {
+        "product_query": "Hiker Water Bottle",
+        "target_sku": "BTL-HIK-500-NAVYBLUE",
+        "quantity": 1
+      },
+      {
+        "product_query": "Kids Bottle",
+        "target_sku": "BTL-KID-350-PINK",
+        "quantity": 1
+      }
+    ],
+    "seed_lines": [],
+    "constraints": [
+      {
+        "type": "item_quantity",
+        "sku": "BTL-KID-350-PINK",
+        "quantity": 1
+      },
+      {
+        "type": "item_quantity",
+        "sku": "BTL-HIK-500-NAVYBLUE",
+        "quantity": 1
+      }
+    ]
+  },
+  "expected": {
+    "lines": {
+      "BTL-HIK-500-NAVYBLUE": 1,
+      "BTL-KID-350-PINK": 1
+    }
+  },
+  "expected_arm_outcomes": {
+    "A": "COMPLETE",
+    "B": "PARTIAL",
+    "C": "PARTIAL"
+  },
+  "labels": [
+    "persisted-state-benign"
+  ],
+  "notes": "multi-item"
+}

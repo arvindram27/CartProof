@@ -1,0 +1,37 @@
+{
+  "task_id": "wrong-variant-01",
+  "fault_class": "wrong-variant",
+  "fault": {
+    "name": "wrong-variant",
+    "params": {}
+  },
+  "runtime": {
+    "items": [
+      {
+        "product_query": "Hiker Water Bottle",
+        "target_sku": "BTL-HIK-500-NAVYBLUE",
+        "quantity": 1
+      }
+    ],
+    "seed_lines": [],
+    "constraints": [
+      {
+        "type": "item_quantity",
+        "sku": "BTL-HIK-500-NAVYBLUE",
+        "quantity": 1
+      }
+    ]
+  },
+  "expected": {
+    "lines": {
+      "BTL-HIK-500-NAVYBLUE": 1
+    }
+  },
+  "expected_arm_outcomes": {
+    "A": "declares COMPLETE, wrong sku",
+    "B": "PARTIAL",
+    "C": "PARTIAL (persistent)"
+  },
+  "labels": [],
+  "notes": ""
+}

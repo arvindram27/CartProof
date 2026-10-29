@@ -1,0 +1,30 @@
+{
+  "suite": "dev",
+  "task_files": [
+    "tasks/clean-01.json",
+    "tasks/clean-02.json",
+    "tasks/clean-03.json",
+    "tasks/clean-04.json",
+    "tasks/silent-drop-01.json",
+    "tasks/silent-drop-02.json",
+    "tasks/silent-drop-03.json",
+    "tasks/wrong-variant-01.json",
+    "tasks/wrong-variant-02.json",
+    "tasks/wrong-variant-03.json",
+    "tasks/quantity-drift-01.json",
+    "tasks/quantity-drift-02.json",
+    "tasks/quantity-drift-03.json",
+    "tasks/stale-total-01.json",
+    "tasks/stale-total-02.json",
+    "tasks/stale-total-03.json",
+    "tasks/dom-api-mismatch-01.json",
+    "tasks/dom-api-mismatch-02.json",
+    "tasks/dom-api-mismatch-03.json",
+    "tasks/slow-consistency-01.json",
+    "tasks/slow-consistency-02.json",
+    "tasks/slow-consistency-03.json",
+    "tasks/external-mutation-01.json",
+    "tasks/external-mutation-02.json",
+    "tasks/external-mutation-03.json"
+  ]
+}

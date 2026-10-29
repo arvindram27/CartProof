@@ -1,0 +1,41 @@
+{
+  "task_id": "slow-consistency-03",
+  "fault_class": "slow-consistency",
+  "fault": {
+    "name": "slow-consistency",
+    "params": {
+      "delay_ms": 0
+    }
+  },
+  "runtime": {
+    "items": [
+      {
+        "product_query": "Hiker Water Bottle",
+        "target_sku": "BTL-HIK-750-STEEL",
+        "quantity": 1
+      }
+    ],
+    "seed_lines": [],
+    "constraints": [
+      {
+        "type": "item_quantity",
+        "sku": "BTL-HIK-750-STEEL",
+        "quantity": 1
+      }
+    ]
+  },
+  "expected": {
+    "lines": {
+      "BTL-HIK-750-STEEL": 1
+    }
+  },
+  "expected_arm_outcomes": {
+    "A": "COMPLETE",
+    "B": "COMPLETE",
+    "C": "COMPLETE"
+  },
+  "labels": [
+    "truly-no-effect"
+  ],
+  "notes": "delay_ms=0"
+}

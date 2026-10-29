@@ -1,0 +1,48 @@
+{
+  "task_id": "clean-03",
+  "fault_class": "clean",
+  "fault": {
+    "name": null,
+    "params": {}
+  },
+  "runtime": {
+    "items": [
+      {
+        "product_query": "Hiker Water Bottle",
+        "target_sku": "BTL-HIK-750-STEEL",
+        "quantity": 1
+      }
+    ],
+    "seed_lines": [
+      {
+        "sku": "BTL-HIK-500-NAVY",
+        "quantity": 1
+      }
+    ],
+    "constraints": [
+      {
+        "type": "item_quantity",
+        "sku": "BTL-HIK-500-NAVY",
+        "quantity": 1
+      },
+      {
+        "type": "item_quantity",
+        "sku": "BTL-HIK-750-STEEL",
+        "quantity": 1
+      }
+    ]
+  },
+  "expected": {
+    "lines": {
+      "BTL-HIK-500-NAVY": 1,
+      "BTL-HIK-750-STEEL": 1
+    }
+  },
+  "expected_arm_outcomes": {
+    "A": "COMPLETE",
+    "B": "COMPLETE",
+    "C": "COMPLETE"
+  },
+  "labels": [],
+  "notes": ""
+}

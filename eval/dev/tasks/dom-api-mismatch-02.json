@@ -1,0 +1,39 @@
+{
+  "task_id": "dom-api-mismatch-02",
+  "fault_class": "dom-api-mismatch",
+  "fault": {
+    "name": "dom-api-mismatch",
+    "params": {}
+  },
+  "runtime": {
+    "items": [
+      {
+        "product_query": "Court Classic",
+        "target_sku": "SHOE-CRT-8-WHITE",
+        "quantity": 1
+      }
+    ],
+    "seed_lines": [],
+    "constraints": [
+      {
+        "type": "item_quantity",
+        "sku": "SHOE-CRT-8-WHITE",
+        "quantity": 1
+      }
+    ]
+  },
+  "expected": {
+    "lines": {
+      "SHOE-CRT-8-WHITE": 1
+    }
+  },
+  "expected_arm_outcomes": {
+    "A": "COMPLETE",
+    "B": "PARTIAL",
+    "C": "PARTIAL"
+  },
+  "labels": [
+    "persisted-state-benign"
+  ],
+  "notes": ""
+}

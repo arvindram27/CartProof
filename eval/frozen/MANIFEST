@@ -1,0 +1,18 @@
+# eval/frozen MANIFEST — SHA-256 of frozen task files (recorded before first dev-result inspection)
+a1934910f5ec0f6931898be4ec27b88eff54365545bc157b72be72b997eee026  tasks/f-clean-01.json
+34fe0a1becf267ff4acfd7e8551b6a4a2e1dd7cc8e9df75352cf061605da1423  tasks/f-clean-02.json
+5ad3a955ff81257361c49709780892a5ff9d5178a130766c3c49d82575cffb3b  tasks/f-clean-03.json
+297ade4c1bdba010112efd7eb773eec804acf5ca61095049c8fea0fca41493ac  tasks/f-silent-drop-01.json
+c0198bbe6e9b151405109495e32ed6fa443967a5a9568fccc5321a9b7fd91647  tasks/f-silent-drop-02.json
+3779ceebff72f75664aab81502e77b3461b021b3f7ad946d18170360e7088c44  tasks/f-wrong-variant-01.json
+335f50f853e0f2b3f4eee7c59cbb4ce7d81affee9b804f147b367b8ff71cba95  tasks/f-wrong-variant-02.json
+400c98553a86e41709e64d72606f6166de335d39b8be6fb64a60f9682cb5e2ce  tasks/f-quantity-drift-01.json
+d4544a29873b1ad0265f2c90e66eb5488c80982bcc9cfa49867c30cd26304361  tasks/f-quantity-drift-02.json
+f389091b599ed49318bbffc567f3deda6b0aebd97e23da69a91ba179938e16e9  tasks/f-stale-total-01.json
+de9078ce23de15a6180597ac35f6d88e04a85929601bc4316d70b42c576af914  tasks/f-stale-total-02.json
+500b05458dcf9a4c67a57fb584987b84ac841c0838f26595792c2929c48abb68  tasks/f-dom-api-mismatch-01.json
+bab8d37ad61f40773c952e68bfe37b65e245425f28a390ae9db4d50730887205  tasks/f-dom-api-mismatch-02.json
+54c25385201b9cbcfb46584d15e3002684c72eff851a0ee09ad1cbdd9b0fa734  tasks/f-slow-consistency-01.json
+6eb3c13f15fcc29fb54089067cf86e58374c24ca206721835486e5b242221808  tasks/f-slow-consistency-02.json
+0f58e8d604d1435cc9c5c69fb6b3ce3279e854e43cc532f33c546a9060f6aa21  tasks/f-external-mutation-01.json
+95c528d79ccee5e060c505904311444aa734523427b92f3b0b263045e397a4f5  tasks/f-external-mutation-02.json

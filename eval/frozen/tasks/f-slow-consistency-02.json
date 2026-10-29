@@ -1,0 +1,41 @@
+{
+  "task_id": "f-slow-consistency-02",
+  "fault_class": "slow-consistency",
+  "fault": {
+    "name": "slow-consistency",
+    "params": {
+      "delay_ms": 500
+    }
+  },
+  "runtime": {
+    "items": [
+      {
+        "product_query": "Trail Runner",
+        "target_sku": "SHOE-TRL-9-NAVYBLUE",
+        "quantity": 1
+      }
+    ],
+    "seed_lines": [],
+    "constraints": [
+      {
+        "type": "item_quantity",
+        "sku": "SHOE-TRL-9-NAVYBLUE",
+        "quantity": 1
+      }
+    ]
+  },
+  "expected": {
+    "lines": {
+      "SHOE-TRL-9-NAVYBLUE": 1
+    }
+  },
+  "expected_arm_outcomes": {
+    "A": "COMPLETE",
+    "B": "COMPLETE",
+    "C": "COMPLETE"
+  },
+  "labels": [
+    "persisted-state-benign"
+  ],
+  "notes": ""
+}

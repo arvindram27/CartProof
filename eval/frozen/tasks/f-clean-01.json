@@ -1,0 +1,37 @@
+{
+  "task_id": "f-clean-01",
+  "fault_class": "clean",
+  "fault": {
+    "name": null,
+    "params": {}
+  },
+  "runtime": {
+    "items": [
+      {
+        "product_query": "Sports Squeeze",
+        "target_sku": "BTL-SPT-24-CLEAR",
+        "quantity": 1
+      }
+    ],
+    "seed_lines": [],
+    "constraints": [
+      {
+        "type": "item_quantity",
+        "sku": "BTL-SPT-24-CLEAR",
+        "quantity": 1
+      }
+    ]
+  },
+  "expected": {
+    "lines": {
+      "BTL-SPT-24-CLEAR": 1
+    }
+  },
+  "expected_arm_outcomes": {
+    "A": "COMPLETE",
+    "B": "COMPLETE",
+    "C": "COMPLETE"
+  },
+  "labels": [],
+  "notes": ""
+}

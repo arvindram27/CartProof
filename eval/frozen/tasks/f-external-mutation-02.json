@@ -1,0 +1,50 @@
+{
+  "task_id": "f-external-mutation-02",
+  "fault_class": "external-mutation",
+  "fault": {
+    "name": "external-mutation",
+    "params": {
+      "delta": 1
+    }
+  },
+  "runtime": {
+    "items": [
+      {
+        "product_query": "Steel Growler",
+        "target_sku": "BTL-GRW-2L-STEEL",
+        "quantity": 1
+      }
+    ],
+    "seed_lines": [
+      {
+        "sku": "BTL-GLS-400-CLEAR",
+        "quantity": 1
+      }
+    ],
+    "constraints": [
+      {
+        "type": "item_quantity",
+        "sku": "BTL-GLS-400-CLEAR",
+        "quantity": 1
+      },
+      {
+        "type": "item_quantity",
+        "sku": "BTL-GRW-2L-STEEL",
+        "quantity": 1
+      }
+    ]
+  },
+  "expected": {
+    "lines": {
+      "BTL-GLS-400-CLEAR": 1,
+      "BTL-GRW-2L-STEEL": 1
+    }
+  },
+  "expected_arm_outcomes": {
+    "A": "declares COMPLETE, seeded mutated",
+    "B": "PARTIAL",
+    "C": "PARTIAL"
+  },
+  "labels": [],
+  "notes": ""
+}

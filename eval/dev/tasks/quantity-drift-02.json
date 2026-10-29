@@ -1,0 +1,39 @@
+{
+  "task_id": "quantity-drift-02",
+  "fault_class": "quantity-drift",
+  "fault": {
+    "name": "quantity-drift",
+    "params": {
+      "delta": 1
+    }
+  },
+  "runtime": {
+    "items": [
+      {
+        "product_query": "Glass Infuser",
+        "target_sku": "BTL-GLS-400-CLEAR",
+        "quantity": 2
+      }
+    ],
+    "seed_lines": [],
+    "constraints": [
+      {
+        "type": "item_quantity",
+        "sku": "BTL-GLS-400-CLEAR",
+        "quantity": 2
+      }
+    ]
+  },
+  "expected": {
+    "lines": {
+      "BTL-GLS-400-CLEAR": 2
+    }
+  },
+  "expected_arm_outcomes": {
+    "A": "declares COMPLETE, qty 3",
+    "B": "PARTIAL",
+    "C": "recovers via PATCH"
+  },
+  "labels": [],
+  "notes": ""
+}

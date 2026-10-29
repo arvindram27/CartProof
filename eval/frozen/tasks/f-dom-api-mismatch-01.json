@@ -1,0 +1,39 @@
+{
+  "task_id": "f-dom-api-mismatch-01",
+  "fault_class": "dom-api-mismatch",
+  "fault": {
+    "name": "dom-api-mismatch",
+    "params": {}
+  },
+  "runtime": {
+    "items": [
+      {
+        "product_query": "Glass Infuser",
+        "target_sku": "BTL-GLS-400-AMBER",
+        "quantity": 1
+      }
+    ],
+    "seed_lines": [],
+    "constraints": [
+      {
+        "type": "item_quantity",
+        "sku": "BTL-GLS-400-AMBER",
+        "quantity": 1
+      }
+    ]
+  },
+  "expected": {
+    "lines": {
+      "BTL-GLS-400-AMBER": 1
+    }
+  },
+  "expected_arm_outcomes": {
+    "A": "COMPLETE",
+    "B": "PARTIAL",
+    "C": "PARTIAL"
+  },
+  "labels": [
+    "persisted-state-benign"
+  ],
+  "notes": ""
+}

@@ -1,0 +1,39 @@
+{
+  "task_id": "f-quantity-drift-02",
+  "fault_class": "quantity-drift",
+  "fault": {
+    "name": "quantity-drift",
+    "params": {
+      "delta": 1
+    }
+  },
+  "runtime": {
+    "items": [
+      {
+        "product_query": "Steel Growler",
+        "target_sku": "BTL-GRW-1L-STEEL",
+        "quantity": 1
+      }
+    ],
+    "seed_lines": [],
+    "constraints": [
+      {
+        "type": "item_quantity",
+        "sku": "BTL-GRW-1L-STEEL",
+        "quantity": 1
+      }
+    ]
+  },
+  "expected": {
+    "lines": {
+      "BTL-GRW-1L-STEEL": 1
+    }
+  },
+  "expected_arm_outcomes": {
+    "A": "declares COMPLETE, qty 2",
+    "B": "PARTIAL",
+    "C": "recovers"
+  },
+  "labels": [],
+  "notes": ""
+}

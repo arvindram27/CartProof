@@ -1,0 +1,37 @@
+{
+  "task_id": "clean-02",
+  "fault_class": "clean",
+  "fault": {
+    "name": null,
+    "params": {}
+  },
+  "runtime": {
+    "items": [
+      {
+        "product_query": "Thermo Flask",
+        "target_sku": "BTL-THR-500-BLACK",
+        "quantity": 2
+      }
+    ],
+    "seed_lines": [],
+    "constraints": [
+      {
+        "type": "item_quantity",
+        "sku": "BTL-THR-500-BLACK",
+        "quantity": 2
+      }
+    ]
+  },
+  "expected": {
+    "lines": {
+      "BTL-THR-500-BLACK": 2
+    }
+  },
+  "expected_arm_outcomes": {
+    "A": "COMPLETE",
+    "B": "COMPLETE",
+    "C": "COMPLETE"
+  },
+  "labels": [],
+  "notes": ""
+}

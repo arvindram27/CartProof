@@ -1,0 +1,48 @@
+{
+  "task_id": "silent-drop-03",
+  "fault_class": "silent-drop",
+  "fault": {
+    "name": "silent-drop",
+    "params": {}
+  },
+  "runtime": {
+    "items": [
+      {
+        "product_query": "Hiker Water Bottle",
+        "target_sku": "BTL-HIK-500-NAVYBLUE",
+        "quantity": 1
+      },
+      {
+        "product_query": "Insulated Tumbler",
+        "target_sku": "BTL-TMB-12-SLATE",
+        "quantity": 1
+      }
+    ],
+    "seed_lines": [],
+    "constraints": [
+      {
+        "type": "item_quantity",
+        "sku": "BTL-HIK-500-NAVYBLUE",
+        "quantity": 1
+      },
+      {
+        "type": "item_quantity",
+        "sku": "BTL-TMB-12-SLATE",
+        "quantity": 1
+      }
+    ]
+  },
+  "expected": {
+    "lines": {
+      "BTL-HIK-500-NAVYBLUE": 1,
+      "BTL-TMB-12-SLATE": 1
+    }
+  },
+  "expected_arm_outcomes": {
+    "A": "declares COMPLETE, cart missing",
+    "B": "PARTIAL",
+    "C": "PARTIAL (persistent)"
+  },
+  "labels": [],
+  "notes": "multi-item"
+}

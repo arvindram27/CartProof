@@ -1,0 +1,39 @@
+{
+  "task_id": "stale-total-02",
+  "fault_class": "stale-total",
+  "fault": {
+    "name": "stale-total",
+    "params": {}
+  },
+  "runtime": {
+    "items": [
+      {
+        "product_query": "Thermo Flask",
+        "target_sku": "BTL-THR-500-BLACK",
+        "quantity": 1
+      }
+    ],
+    "seed_lines": [],
+    "constraints": [
+      {
+        "type": "item_quantity",
+        "sku": "BTL-THR-500-BLACK",
+        "quantity": 1
+      }
+    ]
+  },
+  "expected": {
+    "lines": {
+      "BTL-THR-500-BLACK": 1
+    }
+  },
+  "expected_arm_outcomes": {
+    "A": "COMPLETE",
+    "B": "COMPLETE",
+    "C": "PARTIAL (arithmetic stop)"
+  },
+  "labels": [
+    "persisted-state-benign"
+  ],
+  "notes": ""
+}

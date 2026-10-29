@@ -1,0 +1,37 @@
+{
+  "task_id": "f-silent-drop-02",
+  "fault_class": "silent-drop",
+  "fault": {
+    "name": "silent-drop",
+    "params": {}
+  },
+  "runtime": {
+    "items": [
+      {
+        "product_query": "City Walker",
+        "target_sku": "SHOE-CTY-9-BROWN",
+        "quantity": 1
+      }
+    ],
+    "seed_lines": [],
+    "constraints": [
+      {
+        "type": "item_quantity",
+        "sku": "SHOE-CTY-9-BROWN",
+        "quantity": 1
+      }
+    ]
+  },
+  "expected": {
+    "lines": {
+      "SHOE-CTY-9-BROWN": 1
+    }
+  },
+  "expected_arm_outcomes": {
+    "A": "declares COMPLETE, missing",
+    "B": "PARTIAL",
+    "C": "PARTIAL"
+  },
+  "labels": [],
+  "notes": ""
+}

@@ -1,0 +1,39 @@
+{
+  "task_id": "f-dom-api-mismatch-02",
+  "fault_class": "dom-api-mismatch",
+  "fault": {
+    "name": "dom-api-mismatch",
+    "params": {}
+  },
+  "runtime": {
+    "items": [
+      {
+        "product_query": "Classic Tee",
+        "target_sku": "SHT-TEE-L-NAVY",
+        "quantity": 1
+      }
+    ],
+    "seed_lines": [],
+    "constraints": [
+      {
+        "type": "item_quantity",
+        "sku": "SHT-TEE-L-NAVY",
+        "quantity": 1
+      }
+    ]
+  },
+  "expected": {
+    "lines": {
+      "SHT-TEE-L-NAVY": 1
+    }
+  },
+  "expected_arm_outcomes": {
+    "A": "COMPLETE",
+    "B": "PARTIAL",
+    "C": "PARTIAL"
+  },
+  "labels": [
+    "persisted-state-benign"
+  ],
+  "notes": ""
+}

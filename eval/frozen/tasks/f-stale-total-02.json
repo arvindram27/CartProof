@@ -1,0 +1,39 @@
+{
+  "task_id": "f-stale-total-02",
+  "fault_class": "stale-total",
+  "fault": {
+    "name": "stale-total",
+    "params": {}
+  },
+  "runtime": {
+    "items": [
+      {
+        "product_query": "Court Classic",
+        "target_sku": "SHOE-CRT-9-WHITE",
+        "quantity": 1
+      }
+    ],
+    "seed_lines": [],
+    "constraints": [
+      {
+        "type": "item_quantity",
+        "sku": "SHOE-CRT-9-WHITE",
+        "quantity": 1
+      }
+    ]
+  },
+  "expected": {
+    "lines": {
+      "SHOE-CRT-9-WHITE": 1
+    }
+  },
+  "expected_arm_outcomes": {
+    "A": "COMPLETE",
+    "B": "COMPLETE",
+    "C": "PARTIAL (arithmetic)"
+  },
+  "labels": [
+    "persisted-state-benign"
+  ],
+  "notes": ""
+}

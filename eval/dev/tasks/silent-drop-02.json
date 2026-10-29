@@ -1,0 +1,37 @@
+{
+  "task_id": "silent-drop-02",
+  "fault_class": "silent-drop",
+  "fault": {
+    "name": "silent-drop",
+    "params": {}
+  },
+  "runtime": {
+    "items": [
+      {
+        "product_query": "Trail Runner",
+        "target_sku": "SHOE-TRL-8-BLACK",
+        "quantity": 1
+      }
+    ],
+    "seed_lines": [],
+    "constraints": [
+      {
+        "type": "item_quantity",
+        "sku": "SHOE-TRL-8-BLACK",
+        "quantity": 1
+      }
+    ]
+  },
+  "expected": {
+    "lines": {
+      "SHOE-TRL-8-BLACK": 1
+    }
+  },
+  "expected_arm_outcomes": {
+    "A": "declares COMPLETE, cart missing",
+    "B": "PARTIAL",
+    "C": "PARTIAL (persistent)"
+  },
+  "labels": [],
+  "notes": ""
+}
