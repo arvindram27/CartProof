@@ -54,7 +54,8 @@ def _seed_agg(seed_lines) -> dict:
 
 
 def build_model_client(script: dict, transport: str = "fake",
-                       allow_live: bool = False, environ=None):
+                       allow_live: bool = False, environ=None,
+                       http_transport=None):
     """Build the budgeted client. Fake is the default and is unchanged.
 
     The meta path is fully gated BEFORE the Meta transport reads any key:
@@ -100,14 +101,16 @@ def build_model_client(script: dict, transport: str = "fake",
         max_calls=int(budget["max_calls"]),
         token_budget=int(budget["token_budget"]),
         max_output_tokens_per_call=int(budget["max_output_tokens"]))
-    meta = MetaModelClient(config, allow_live=allow_live, environ=environ)
+    meta = MetaModelClient(config, allow_live=allow_live, environ=environ,
+                           transport=http_transport)
     return BudgetedModelClient(meta, config, allow_live=allow_live), meta
 
 
 def execute_model_run(setup: dict, fault: dict, arm: str, trial: int,
                       fake_script: dict, db_path: str, out_dir,
                       settle_ms: int = 2000, transport: str = "fake",
-                      allow_live: bool = False) -> dict:
+                      allow_live: bool = False, smoke_guard: bool = False,
+                      environ=None, http_transport=None) -> dict:
     from adapter.actions import BrowserSession
     from adapter.observations import read_api_cart, read_dom_cart
     from agents.careful_agent import CarefulAgent
@@ -137,7 +140,14 @@ def execute_model_run(setup: dict, fault: dict, arm: str, trial: int,
 
     run["transport"] = transport
     client, _inner = build_model_client(fake_script, transport=transport,
-                                        allow_live=allow_live)
+                                        allow_live=allow_live, environ=environ,
+                                        http_transport=http_transport)
+    transport_kind = transport  # validated branch actually constructed
+    run["transport"] = transport_kind
+    run["smoke_guard_enabled"] = bool(smoke_guard)
+    if smoke_guard:
+        from agents.smoke_guard import SmokeAccountingGuard
+        client = SmokeAccountingGuard(client, transport_kind=transport_kind)
     fake = _inner if transport == "fake" else None
     config = client.config
     catalog = load_catalog()
@@ -363,28 +373,65 @@ def run_one_cli(argv) -> int:
     p.add_argument("--settle-ms", type=int, default=2000)
     args = p.parse_args(argv)
     spec = json.loads(Path(args.spec).read_text(encoding="utf-8"))
+
+    def _error_run(status: str, error: str) -> dict:
+        return {"arm": spec.get("arm"), "trial": spec.get("trial", 1),
+                "declared_outcome": None, "raw_verdict": None,
+                "execution_status": status, "error": error,
+                "seed_lines": (spec.get("setup") or {}).get("seed_lines") or [],
+                "items": [], "snapshots": [], "mutations": [],
+                "hook_counts": {"before_add": 0, "after_add": 0, "pre_add": 0},
+                "adapter_mutations": {"add_to_cart": 0, "set_line_quantity": 0,
+                                      "delete_line": 0},
+                "stop_reasons": [], "final_cookie": None,
+                "final_persisted": None,
+                "guard": {"applied": spec.get("arm") in ("MB", "MC")}}
+
+    smoke_raw = spec.get("smoke", False)
+    if not isinstance(smoke_raw, bool):
+        run = _error_run("harness-error", "smoke_flag_invalid")
+        (Path(args.out) / "run.json").write_text(
+            json.dumps(run, indent=2, default=str), encoding="utf-8")
+        print(json.dumps({"arm": run.get("arm"),
+                          "execution_status": run["execution_status"],
+                          "declared_outcome": None}))
+        return 0
+
+    # Owned startup barrier (Brief 7 smoke only): wait before any setup that
+    # can start store/browser children until the parent has assigned the
+    # worker to its job object and released it.
+    barrier = spec.get("_startup_barrier")
+    if barrier is not None:
+        import time as _time
+        ready = Path(barrier["ready"])
+        release = Path(barrier["release"])
+        ready.write_text(json.dumps({"pid": __import__("os").getpid()}),
+                         encoding="utf-8")
+        deadline = _time.monotonic() + 30.0
+        while not release.exists():
+            if _time.monotonic() > deadline:
+                run = _error_run("harness-error", "startup_barrier_timeout")
+                (Path(args.out) / "run.json").write_text(
+                    json.dumps(run, indent=2, default=str), encoding="utf-8")
+                print(json.dumps({"arm": run.get("arm"),
+                                  "execution_status": run["execution_status"],
+                                  "declared_outcome": None}))
+                return 0
+            _time.sleep(0.05)
+
     try:
         run = execute_model_run(spec["setup"], spec.get("fault") or
                                 {"name": None, "params": {}}, spec["arm"],
                                 int(spec.get("trial", 1)), spec["fake_script"],
                                 args.db, args.out, settle_ms=args.settle_ms,
                                 transport=spec.get("transport", "fake"),
-                                allow_live=bool(spec.get("allow_live", False)))
+                                allow_live=bool(spec.get("allow_live", False)),
+                                smoke_guard=smoke_raw)
     except Exception as exc:
         from agents.meta_client import MetaConfigError
         status = "harness-error" if isinstance(exc, MetaConfigError) else "crash"
-        run = {"arm": spec.get("arm"), "trial": spec.get("trial", 1),
-               "declared_outcome": None, "raw_verdict": None,
-               "execution_status": status,
-               "error": (str(exc) if isinstance(exc, MetaConfigError)
-                         else traceback.format_exc()),
-               "seed_lines": (spec.get("setup") or {}).get("seed_lines") or [],
-               "items": [], "snapshots": [], "mutations": [],
-               "hook_counts": {"before_add": 0, "after_add": 0, "pre_add": 0},
-               "adapter_mutations": {"add_to_cart": 0, "set_line_quantity": 0,
-                                     "delete_line": 0},
-               "stop_reasons": [], "final_cookie": None, "final_persisted": None,
-               "guard": {"applied": spec.get("arm") in ("MB", "MC")}}
+        run = _error_run(status, str(exc) if isinstance(exc, MetaConfigError)
+                         else traceback.format_exc())
     (Path(args.out) / "run.json").write_text(
         json.dumps(run, indent=2, default=str), encoding="utf-8")
     print(json.dumps({"arm": run.get("arm"),
@@ -444,7 +491,16 @@ def _spawn(task: dict, arm: str, trial: int, rundir: Path, args,
     run["task_id"] = task["task_id"]
     run["fault_class"] = task.get("fault_class") or "clean"
     run["fault_schedule"] = task.get("fault")
+    return measure_worker_run(run, task, rundir)
 
+
+def measure_worker_run(run: dict, task: dict, rundir: Path) -> dict:
+    """Parent-side independent measurement of a worker result (single path).
+
+    Used by _spawn and by the Brief 7 smoke launcher. Never modifies the
+    worker's raw run.json on disk.
+    """
+    rundir = Path(rundir)
     final_db = rundir / "final.db"
     if not final_db.exists():
         try:
