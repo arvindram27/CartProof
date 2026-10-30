@@ -142,4 +142,12 @@ agree.
   fault that remains active on every write ends `PARTIAL` — this is not a claim
   of real-merchant reliability or model-agent improvement.
 
+## Project Meta key (private, after review)
+
+After implementation, source, and test review — never before — the human may
+privately create `.env` in the project root containing a single
+`MODEL_API_KEY` assignment line, using a local editor with AI assistance
+disabled. Saving `.env` never authorizes live use; a live smoke still needs
+its own separate approval.
+
 

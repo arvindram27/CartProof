@@ -178,7 +178,8 @@ class MetaModelClient:
 
     def __init__(self, config: ClientConfig, *, allow_live: bool = False,
                  environ=None, http_client: Optional[httpx.Client] = None,
-                 transport: Optional[httpx.BaseTransport] = None):
+                 transport: Optional[httpx.BaseTransport] = None,
+                 dotenv_fallback=None):
         # Gate order: every check below runs BEFORE the key is read.
         if not config.live_enabled or not allow_live:
             raise LiveTransportNotAuthorized("live_not_authorized")
@@ -196,9 +197,34 @@ class MetaModelClient:
                 raise MetaConfigError("reasoning_effort_missing")
 
         env = os.environ if environ is None else environ
-        api_key = env.get("MODEL_API_KEY")
-        if not api_key:
-            raise MetaConfigError("model_api_key_missing")
+        if "MODEL_API_KEY" in env:
+            val = env["MODEL_API_KEY"]
+            if not isinstance(val, str) or not val.strip():
+                raise MetaConfigError("model_api_key_invalid")
+            api_key = val
+        elif dotenv_fallback is not None:
+            from .env_loader import DotEnvError
+            try:
+                fallback_value = dotenv_fallback()
+            except DotEnvError as exc:
+                # Only the fixed known categories may cross this boundary;
+                # anything else maps to one generic category with no context.
+                _known = {"dot_env_missing", "dot_env_empty",
+                          "dot_env_too_large", "dot_env_invalid_encoding",
+                          "dot_env_invalid_syntax", "dot_env_unsafe_path",
+                          "dot_env_read_error"}
+                category = str(exc) if str(exc) in _known \
+                    else "model_api_key_missing"
+                raise MetaConfigError(category) from None
+            except Exception:
+                raise MetaConfigError("model_api_key_missing") from None
+            if not isinstance(fallback_value, str) or not fallback_value.strip():
+                raise MetaConfigError("model_api_key_missing")
+            api_key = fallback_value
+        else:
+            api_key = env.get("MODEL_API_KEY")
+            if not api_key:
+                raise MetaConfigError("model_api_key_missing")
 
         self.config = config
         self.base_url = base_url

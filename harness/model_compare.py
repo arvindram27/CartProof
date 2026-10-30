@@ -25,6 +25,10 @@ from pathlib import Path
 import httpx
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+# Lexical (unresolved) repository root for the credential loader: symlink and
+# junction components must still be visible to its checks, so this one must
+# NOT be passed through resolve().
+_LEXICAL_ROOT = Path(__file__).absolute().parents[1]
 
 from harness.run_task import boot_server, stop_server  # noqa: E402
 from harness.snapshots import (  # noqa: E402
@@ -55,7 +59,7 @@ def _seed_agg(seed_lines) -> dict:
 
 def build_model_client(script: dict, transport: str = "fake",
                        allow_live: bool = False, environ=None,
-                       http_transport=None):
+                       http_transport=None, dotenv_fallback=None):
     """Build the budgeted client. Fake is the default and is unchanged.
 
     The meta path is fully gated BEFORE the Meta transport reads any key:
@@ -102,7 +106,8 @@ def build_model_client(script: dict, transport: str = "fake",
         token_budget=int(budget["token_budget"]),
         max_output_tokens_per_call=int(budget["max_output_tokens"]))
     meta = MetaModelClient(config, allow_live=allow_live, environ=environ,
-                           transport=http_transport)
+                           transport=http_transport,
+                           dotenv_fallback=dotenv_fallback)
     return BudgetedModelClient(meta, config, allow_live=allow_live), meta
 
 
@@ -110,7 +115,8 @@ def execute_model_run(setup: dict, fault: dict, arm: str, trial: int,
                       fake_script: dict, db_path: str, out_dir,
                       settle_ms: int = 2000, transport: str = "fake",
                       allow_live: bool = False, smoke_guard: bool = False,
-                      environ=None, http_transport=None) -> dict:
+                      environ=None, http_transport=None,
+                      dotenv_fallback=None) -> dict:
     from adapter.actions import BrowserSession
     from adapter.observations import read_api_cart, read_dom_cart
     from agents.careful_agent import CarefulAgent
@@ -139,9 +145,12 @@ def execute_model_run(setup: dict, fault: dict, arm: str, trial: int,
     }
 
     run["transport"] = transport
-    client, _inner = build_model_client(fake_script, transport=transport,
-                                        allow_live=allow_live, environ=environ,
-                                        http_transport=http_transport)
+    _build_kwargs = {}
+    if dotenv_fallback is not None:
+        _build_kwargs["dotenv_fallback"] = dotenv_fallback
+    client, _inner = build_model_client(
+        fake_script, transport=transport, allow_live=allow_live,
+        environ=environ, http_transport=http_transport, **_build_kwargs)
     transport_kind = transport  # validated branch actually constructed
     run["transport"] = transport_kind
     run["smoke_guard_enabled"] = bool(smoke_guard)
@@ -365,6 +374,57 @@ def execute_model_run(setup: dict, fault: dict, arm: str, trial: int,
     return run
 
 
+def _make_smoke_dotenv_fallback(spec: dict):
+    """Worker-local fixed-smoke validation, then a zero-I/O lazy callback.
+
+    Runs after the startup barrier. Only a validated fixed smoke Meta
+    selection (smoke is True, transport meta, allow_live exactly True, and
+    the spec field-for-field equal to the canonical expected smoke spec)
+    gets a fallback. Creating the callback reads nothing. Ordinary and
+    generic runs return None and keep their existing behavior.
+    """
+    from agents.env_loader import make_dotenv_fallback
+    from agents.meta_client import MetaConfigError
+
+    # Smoke path is active (the caller validated `smoke` is a real bool and
+    # only calls this when it is True). A smoke Meta request without exactly
+    # allow_live=True is denied loudly here, never silently downgraded.
+    if spec.get("transport") != "meta":
+        return None
+    if spec.get("allow_live") is not True:
+        raise MetaConfigError("smoke_live_not_authorized")
+    from harness.model_smoke import (build_effective_config, build_worker_spec,
+                                     resolve_selection)
+    try:
+        task = resolve_selection(PROJECT_ROOT, "eval/model/dev/suite.json",
+                                 "m-clean-explicit-sku", "MA", 1, "meta", True)
+    except Exception:
+        raise MetaConfigError("smoke_selection_invalid") from None
+    effective = build_effective_config("meta")
+    canonical_script = {k: effective[k] for k in ("budget", "client")}
+    expected = build_worker_spec(task, "meta", True, canonical_script)
+
+    def _is_int(v):
+        return isinstance(v, int) and not isinstance(v, bool)
+
+    setup = spec.get("setup")
+    ok = (
+        isinstance(setup, dict)
+        and setup.get("request_text") == expected["setup"]["request_text"]
+        and setup.get("seed_lines") == expected["setup"]["seed_lines"]
+        and spec.get("fault") == expected["fault"]
+        and isinstance(spec.get("arm"), str) and spec.get("arm") == "MA"
+        and _is_int(spec.get("trial")) and spec.get("trial") == 1
+        and spec.get("fake_script") == canonical_script
+        and spec.get("transport") == "meta"
+        and spec.get("allow_live") is True
+        and spec.get("smoke") is True
+    )
+    if not ok:
+        raise MetaConfigError("smoke_spec_mismatch")
+    return make_dotenv_fallback(_LEXICAL_ROOT)
+
+
 def run_one_cli(argv) -> int:
     p = argparse.ArgumentParser(description="Run one model arm")
     p.add_argument("--spec", required=True)
@@ -420,13 +480,16 @@ def run_one_cli(argv) -> int:
             _time.sleep(0.05)
 
     try:
+        dotenv_fallback = _make_smoke_dotenv_fallback(spec) \
+            if smoke_raw else None
         run = execute_model_run(spec["setup"], spec.get("fault") or
                                 {"name": None, "params": {}}, spec["arm"],
                                 int(spec.get("trial", 1)), spec["fake_script"],
                                 args.db, args.out, settle_ms=args.settle_ms,
                                 transport=spec.get("transport", "fake"),
                                 allow_live=bool(spec.get("allow_live", False)),
-                                smoke_guard=smoke_raw)
+                                smoke_guard=smoke_raw,
+                                dotenv_fallback=dotenv_fallback)
     except Exception as exc:
         from agents.meta_client import MetaConfigError
         status = "harness-error" if isinstance(exc, MetaConfigError) else "crash"

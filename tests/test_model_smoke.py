@@ -340,10 +340,11 @@ def _run_mocked_launcher(monkeypatch, tmp_path, bodies):
     env = _RecordingEnv({"MODEL_API_KEY": DUMMY})
 
     def factory(script, transport="fake", allow_live=False, environ=None,
-                http_transport=None):
+                http_transport=None, dotenv_fallback=None):
         return real_build(script, transport=transport, allow_live=allow_live,
                           environ=env,
-                          http_transport=httpx.MockTransport(handler))
+                          http_transport=httpx.MockTransport(handler),
+                          dotenv_fallback=dotenv_fallback)
 
     monkeypatch.setattr(model_compare, "build_model_client", factory)
 
@@ -793,10 +794,11 @@ def test_mocked_meta_429_through_launcher_has_no_retry(monkeypatch, tmp_path):
     env = _RecordingEnv({"MODEL_API_KEY": DUMMY})
 
     def factory(script, transport="fake", allow_live=False, environ=None,
-                http_transport=None):
+                http_transport=None, dotenv_fallback=None):
         return real_build(script, transport=transport, allow_live=allow_live,
                           environ=env,
-                          http_transport=httpx.MockTransport(handler))
+                          http_transport=httpx.MockTransport(handler),
+                          dotenv_fallback=dotenv_fallback)
 
     monkeypatch.setattr(model_compare, "build_model_client", factory)
 
