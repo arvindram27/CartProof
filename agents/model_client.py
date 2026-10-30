@@ -53,6 +53,23 @@ class ClientConfig:
     max_calls: int = 40
     token_budget: int = 20000
     max_output_tokens_per_call: int = 512
+    # Brief 6 (all defaulted; existing constructions untouched):
+    live_enabled: bool = False
+    reasoning_effort_by_kind: dict = field(default_factory=dict)
+    price_table: Optional[dict] = None  # dated price table; None -> cost unknown
+    connect_timeout_s: float = 5.0
+    read_timeout_s: float = 30.0
+
+
+def is_exact_meta_origin(url: Optional[str]) -> bool:
+    """Exact Meta origin: https, api.meta.ai, port 443, /v1, nothing else."""
+    if not url:
+        return False
+    p = urlparse(url)
+    return (p.scheme == "https" and p.hostname == "api.meta.ai"
+            and (p.port is None or p.port == 443)
+            and p.username is None and p.password is None
+            and p.path == "/v1" and not p.query and not p.fragment)
 
 
 class ModelClient(Protocol):
@@ -80,10 +97,13 @@ def _valid_usage(u: Optional[Usage]) -> Optional[int]:
 class BudgetedModelClient:
     """Fail-closed budget wrapper. Uncertainty always counts against budget."""
 
-    def __init__(self, inner: Any, config: Optional[ClientConfig] = None):
+    def __init__(self, inner: Any, config: Optional[ClientConfig] = None,
+                 allow_live: bool = False):
         self.inner = inner
         self.config = config or ClientConfig()
+        self.allow_live = bool(allow_live)
         self.records: list[dict] = []
+        self.sidecars: dict[int, dict] = {}
         self.calls_attempted = 0
         self.calls_made = 0
         self.calls_refused = 0
@@ -91,6 +111,18 @@ class BudgetedModelClient:
         self.reserved_tokens = 0
         self.overrun = False
         self._stopped = False
+
+    def _drain_sidecar(self, call_index: int) -> None:
+        pop = getattr(self.inner, "pop_sidecar", None)
+        if callable(pop):
+            try:
+                entry = pop()
+            except Exception:
+                entry = None
+            if entry is not None:
+                entry = dict(entry)
+                entry["call_index"] = call_index
+                self.sidecars[call_index] = entry
 
     def propose(self, request: ModelRequest, is_retry: bool = False) -> ModelProposal:
         cfg = self.config
@@ -112,14 +144,72 @@ class BudgetedModelClient:
         if self._stopped:
             return refuse("stopped_after_overrun")
         if cfg.base_url:
-            host = urlparse(cfg.base_url).hostname
-            if host not in ("127.0.0.1", "localhost"):
+            if cfg.provider == "meta" and cfg.live_enabled and self.allow_live:
+                if not is_exact_meta_origin(cfg.base_url):
+                    return refuse("origin_not_allowlisted")
+            elif urlparse(cfg.base_url).hostname not in ("127.0.0.1", "localhost"):
                 return refuse("non_localhost_destination")
         if self.calls_made >= cfg.max_calls:
             return refuse("max_calls_exceeded")
 
-        max_out = request.max_output_tokens or cfg.max_output_tokens_per_call
-        reservation = _estimate_input_tokens(request) + max_out
+        # One validated output cap for both reserve and send (Condition 2):
+        # inspect the PROVIDED raw value first - a bool, non-int, or negative
+        # fails closed and never falls through the `or` fallback. Fallback to
+        # the configured value only when the request value is absent/None/0.
+        provided = request.max_output_tokens
+        if provided is not None:
+            if isinstance(provided, bool) or not isinstance(provided, int) \
+                    or provided < 0:
+                self.records.append({
+                    "call_index": idx, "kind": request.kind, "status": "error",
+                    "reason": "cap_invalid", "reserved": 0, "consumed": 0,
+                    "declared_usage": None, "is_retry": is_retry})
+                return ModelProposal(kind=request.kind, payload=None,
+                                     status="error", model_name=cfg.model_name,
+                                     error="cap_invalid")
+        max_out = provided if provided else cfg.max_output_tokens_per_call
+        is_live = (cfg.provider == "meta" and cfg.live_enabled and self.allow_live)
+        if is_live:
+            cfg_cap = cfg.max_output_tokens_per_call
+            if not isinstance(cfg_cap, int) or isinstance(cfg_cap, bool) \
+                    or cfg_cap <= 0 or not isinstance(max_out, int) \
+                    or isinstance(max_out, bool) or max_out <= 0 \
+                    or max_out > cfg_cap:
+                self.records.append({
+                    "call_index": idx, "kind": request.kind, "status": "error",
+                    "reason": "cap_invalid", "reserved": 0, "consumed": 0,
+                    "declared_usage": None, "is_retry": is_retry})
+                return ModelProposal(kind=request.kind, payload=None,
+                                     status="error", model_name=cfg.model_name,
+                                     error="cap_invalid")
+
+        # Backward-compatible estimate hook: an inner client that provides
+        # estimate_input_tokens (the Meta transport) counts the full
+        # serialized request body; FakeModelClient does not implement it and
+        # its behaviour is byte-identical.
+        estimator = getattr(self.inner, "estimate_input_tokens", None)
+        try:
+            estimated = estimator(request) if callable(estimator) \
+                else _estimate_input_tokens(request)
+        except Exception:
+            self.records.append({
+                "call_index": idx, "kind": request.kind, "status": "error",
+                "reason": "estimate_failed", "reserved": 0, "consumed": 0,
+                "declared_usage": None, "is_retry": is_retry})
+            return ModelProposal(kind=request.kind, payload=None,
+                                 status="error", model_name=cfg.model_name,
+                                 error="estimate_failed")
+        if not isinstance(estimated, int) or isinstance(estimated, bool) \
+                or estimated < 0:
+            self.records.append({
+                "call_index": idx, "kind": request.kind, "status": "error",
+                "reason": "estimate_invalid", "reserved": 0, "consumed": 0,
+                "declared_usage": None, "is_retry": is_retry})
+            return ModelProposal(kind=request.kind, payload=None,
+                                 status="error", model_name=cfg.model_name,
+                                 error="estimate_invalid")
+
+        reservation = estimated + max_out
         if self.consumed_tokens + reservation > cfg.token_budget:
             return refuse("budget_exceeded")
 
@@ -128,6 +218,7 @@ class BudgetedModelClient:
         try:
             proposal = self.inner.propose(request)
         except Exception as exc:
+            self._drain_sidecar(idx)
             self.consumed_tokens += reservation
             self.records.append({
                 "call_index": idx, "kind": request.kind, "status": "error",
@@ -137,6 +228,7 @@ class BudgetedModelClient:
             })
             return ModelProposal(kind=request.kind, payload=None, status="error",
                                  model_name=cfg.model_name, error=repr(exc))
+        self._drain_sidecar(idx)
 
         declared = _valid_usage(proposal.usage)
         if declared is None:
@@ -186,6 +278,7 @@ class BudgetedModelClient:
             "token_budget": self.config.token_budget,
             "overrun": self.overrun,
             "records": list(self.records),
+            "sidecar": [self.sidecars[k] for k in sorted(self.sidecars)],
             "note": ("Budget caps are best-effort fail-closed guards, not a hard "
                      "token or dollar guarantee."),
         }

@@ -53,9 +53,61 @@ def _seed_agg(seed_lines) -> dict:
     return out
 
 
+def build_model_client(script: dict, transport: str = "fake",
+                       allow_live: bool = False, environ=None):
+    """Build the budgeted client. Fake is the default and is unchanged.
+
+    The meta path is fully gated BEFORE the Meta transport reads any key:
+    explicit genuine-positive budget values are required, and the separate
+    allow_live authorization is forwarded only from the operator CLI.
+    """
+    from agents.model_client import (BudgetedModelClient, ClientConfig,
+                                     FakeModelClient)
+
+    script = script or {}
+    budget = dict(script.get("budget") or {})
+    if transport == "fake":
+        config = ClientConfig(
+            enabled=True, model_name=budget.get("model_name", "fake-model"),
+            max_calls=int(budget.get("max_calls", 40)),
+            token_budget=int(budget.get("token_budget", 20000)),
+            max_output_tokens_per_call=int(budget.get("max_output_tokens", 512)))
+        fake = FakeModelClient(copy.deepcopy(script.get("responses") or []),
+                               model_name=config.model_name)
+        return BudgetedModelClient(fake, config), fake
+
+    if transport != "meta":
+        raise ValueError("unknown_transport")
+
+    from agents.meta_client import MetaConfigError, MetaModelClient
+
+    # Explicit-budget gate: missing/null/bool/zero/negative/non-int fails here,
+    # before MetaModelClient construction reads any key.
+    for key in ("max_calls", "token_budget", "max_output_tokens"):
+        v = budget.get(key)
+        if not isinstance(v, int) or isinstance(v, bool) or v <= 0:
+            raise MetaConfigError("budget_invalid")
+    client_in = dict(script.get("client") or {})
+    if not client_in.get("model_name"):
+        raise MetaConfigError("model_missing")
+    config = ClientConfig(
+        enabled=True, provider="meta",
+        base_url=client_in.get("base_url", "https://api.meta.ai/v1"),
+        model_name=client_in["model_name"], live_enabled=True,
+        reasoning_effort_by_kind=dict(
+            client_in.get("reasoning_effort_by_kind") or {}),
+        price_table=client_in.get("price_table"),
+        max_calls=int(budget["max_calls"]),
+        token_budget=int(budget["token_budget"]),
+        max_output_tokens_per_call=int(budget["max_output_tokens"]))
+    meta = MetaModelClient(config, allow_live=allow_live, environ=environ)
+    return BudgetedModelClient(meta, config, allow_live=allow_live), meta
+
+
 def execute_model_run(setup: dict, fault: dict, arm: str, trial: int,
                       fake_script: dict, db_path: str, out_dir,
-                      settle_ms: int = 2000) -> dict:
+                      settle_ms: int = 2000, transport: str = "fake",
+                      allow_live: bool = False) -> dict:
     from adapter.actions import BrowserSession
     from adapter.observations import read_api_cart, read_dom_cart
     from agents.careful_agent import CarefulAgent
@@ -83,15 +135,11 @@ def execute_model_run(setup: dict, fault: dict, arm: str, trial: int,
         "guard": {"applied": arm in ("MB", "MC")},
     }
 
-    budget_cfg = dict(fake_script.get("budget") or {})
-    config = ClientConfig(
-        enabled=True, model_name=budget_cfg.get("model_name", "fake-model"),
-        max_calls=int(budget_cfg.get("max_calls", 40)),
-        token_budget=int(budget_cfg.get("token_budget", 20000)),
-        max_output_tokens_per_call=int(budget_cfg.get("max_output_tokens", 512)))
-    fake = FakeModelClient(copy.deepcopy(fake_script.get("responses") or []),
-                           model_name=config.model_name)
-    client = BudgetedModelClient(fake, config)
+    run["transport"] = transport
+    client, _inner = build_model_client(fake_script, transport=transport,
+                                        allow_live=allow_live)
+    fake = _inner if transport == "fake" else None
+    config = client.config
     catalog = load_catalog()
 
     from store.app import create_app, create_control_app
@@ -301,7 +349,8 @@ def execute_model_run(setup: dict, fault: dict, arm: str, trial: int,
         if actor is not None:
             run.update(actor.record())
         run["budget"] = client.summary()
-        run["model_client_requests"] = fake.requests
+        run["model_call_sidecar"] = client.summary()["sidecar"]
+        run["model_client_requests"] = fake.requests if fake is not None else []
 
     return run
 
@@ -318,11 +367,17 @@ def run_one_cli(argv) -> int:
         run = execute_model_run(spec["setup"], spec.get("fault") or
                                 {"name": None, "params": {}}, spec["arm"],
                                 int(spec.get("trial", 1)), spec["fake_script"],
-                                args.db, args.out, settle_ms=args.settle_ms)
-    except Exception:
+                                args.db, args.out, settle_ms=args.settle_ms,
+                                transport=spec.get("transport", "fake"),
+                                allow_live=bool(spec.get("allow_live", False)))
+    except Exception as exc:
+        from agents.meta_client import MetaConfigError
+        status = "harness-error" if isinstance(exc, MetaConfigError) else "crash"
         run = {"arm": spec.get("arm"), "trial": spec.get("trial", 1),
                "declared_outcome": None, "raw_verdict": None,
-               "execution_status": "crash", "error": traceback.format_exc(),
+               "execution_status": status,
+               "error": (str(exc) if isinstance(exc, MetaConfigError)
+                         else traceback.format_exc()),
                "seed_lines": (spec.get("setup") or {}).get("seed_lines") or [],
                "items": [], "snapshots": [], "mutations": [],
                "hook_counts": {"before_add": 0, "after_add": 0, "pre_add": 0},
@@ -360,7 +415,10 @@ def _spawn(task: dict, arm: str, trial: int, rundir: Path, args,
         "setup": {"request_text": task["runtime"]["request_text"],
                   "seed_lines": task["runtime"].get("seed_lines") or []},
         "fault": task.get("fault"), "arm": arm, "trial": trial,
-        "fake_script": fake_script}), encoding="utf-8")
+        "fake_script": fake_script,
+        "transport": getattr(args, "transport", "fake"),
+        "allow_live": bool(getattr(args, "allow_live", False))}),
+        encoding="utf-8")
     cmd = [sys.executable, "-m", "harness.model_compare", "--run-one",
            "--spec", str(spec_file), "--db", str(rundir / "run.db"),
            "--out", str(rundir), "--settle-ms", str(args.settle_ms)]
@@ -412,6 +470,9 @@ def run_suite_cli(argv) -> int:
     p.add_argument("--settle-ms", type=int, default=2000)
     p.add_argument("--timeout", type=int, default=180)
     p.add_argument("--trials", type=int, default=1)
+    p.add_argument("--transport", choices=("fake", "meta"), default="fake")
+    p.add_argument("--allow-live", action="store_true",
+                   help="separate live authorization (operator CLI only)")
     args = p.parse_args(argv)
 
     suite_path = Path(args.suite).resolve()
