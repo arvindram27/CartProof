@@ -370,6 +370,30 @@ class _ProcessInformation(ctypes.Structure):
 _CREATE_SUSPENDED = 0x00000004
 _STARTF_USESTDHANDLES = 0x00000100
 _HANDLE_FLAG_INHERIT = 0x00000001
+_CREATE_UNICODE_ENVIRONMENT = 0x00000400
+
+_PILOT_ENV_ALLOW = (
+    'PATH', 'SYSTEMROOT', 'SYSTEMDRIVE', 'WINDIR', 'TEMP', 'TMP',
+    'COMSPEC', 'PATHEXT', 'USERPROFILE', 'LOCALAPPDATA', 'APPDATA',
+    'PROGRAMDATA', 'PROGRAMFILES', 'PROGRAMFILES(X86)',
+    'NUMBER_OF_PROCESSORS', 'OS', 'PROCESSOR_ARCHITECTURE',
+    'VIRTUAL_ENV',
+)
+
+def _pilot_env_block(environ=None, allow=None) -> str:
+    # Explicit allowlist only; MODEL_API_KEY is never referenced.
+    import os as _os
+    env = _os.environ if environ is None else environ
+    names = _PILOT_ENV_ALLOW if allow is None else tuple(allow)
+    parts = []
+    for k in names:
+        if k in env:
+            parts.append(f'{k}={env[k]}')
+    # Deliberately forced, never inherited.
+    parts.append('PYTHONDONTWRITEBYTECODE=1')
+    parts.sort(key=str.lower)
+    return '\0'.join(parts) + '\0\0'
+
 
 
 class _SuspendedProcess:
@@ -380,7 +404,7 @@ class _SuspendedProcess:
     """
 
     def __init__(self, cmd: list, cwd: Path, stdout_path: Path,
-                 stderr_path: Path):
+                 stderr_path: Path, env_block: str | None = None):
         if sys.platform != "win32":
             raise _JobError("suspended_spawn_unsupported_platform")
         import msvcrt
@@ -431,8 +455,17 @@ class _SuspendedProcess:
         si.hStdInput, si.hStdOutput, si.hStdError = handles
         pi = _ProcessInformation()
         cmdline = ctypes.create_unicode_buffer(subprocess.list2cmdline(cmd))
+        env_ptr = None
+        env_buf = None
+        creation_flags = _CREATE_SUSPENDED
+        if env_block is not None:
+            env_buf = ctypes.create_unicode_buffer(env_block)
+            env_ptr = ctypes.cast(env_buf, ctypes.c_void_p)
+            creation_flags |= _CREATE_UNICODE_ENVIRONMENT
+            # keep buffer alive
+            self._env_buf = env_buf
         ok = k.CreateProcessW(
-            cmd[0], cmdline, None, None, True, _CREATE_SUSPENDED, None,
+            cmd[0], cmdline, None, None, True, creation_flags, env_ptr,
             str(cwd), ctypes.byref(si), ctypes.byref(pi))
         if not ok:
             self._close_files()
@@ -484,19 +517,12 @@ class _SuspendedProcess:
         return ok
 
 
-def _default_spawn(ctx: dict, cmd_prefix: Optional[list] = None):
-    """Real subprocess spawn: suspended create, job assign, resume, barrier.
-
-    ``cmd_prefix`` is an internal Python-level test seam only (never set by
-    the CLI, a spec, or the environment): when present it replaces the
-    ``python -m harness.model_compare --run-one`` prefix, e.g. with a
-    test-generated tripwire bootstrap.
-    """
+def _run_owned_worker(ctx: dict, cmd: list, env_block: str | None = None):
     rundir: Path = ctx["rundir"]
     spec: dict = ctx["spec"]
     timeout_s: float = ctx["timeout_seconds"]
-    spawn_info: dict[str, Any] = {"cleanup_status": "not_started",
-                                  "timed_out": False, "job_assigned": False}
+    spawn_info: dict[str, object] = {"cleanup_status": "not_started",
+                                   "timed_out": False, "job_assigned": False}
     barrier = {"ready": str(rundir / "barrier-ready.json"),
                "release": str(rundir / "barrier-release")}
     spec = dict(spec)
@@ -504,55 +530,44 @@ def _default_spawn(ctx: dict, cmd_prefix: Optional[list] = None):
     spec_path = rundir / "worker_spec.json"
     spec_path.write_text(json.dumps(spec, indent=2), encoding="utf-8")
     ctx["spec_path"] = spec_path
+    worker_args = ["--spec", str(spec_path), "--db", str(rundir / "run.db"), "--out", str(rundir)]
+    full_cmd = list(cmd) + worker_args
+    return _owned_lifecycle(ctx, full_cmd, env_block, spawn_info, barrier)
 
-    worker_args = ["--spec", str(spec_path), "--db", str(rundir / "run.db"),
-                   "--out", str(rundir)]
-    if cmd_prefix:
-        cmd = list(cmd_prefix) + worker_args
-    else:
-        cmd = [sys.executable, "-m", "harness.model_compare",
-               "--run-one"] + worker_args
-    job: Optional[_JobObject] = None
-    proc: Optional[_SuspendedProcess] = None
+
+def _owned_lifecycle(ctx: dict, cmd: list, env_block: str | None, spawn_info: dict, barrier: dict):
+    rundir: Path = ctx["rundir"]
+    timeout_s: float = ctx["timeout_seconds"]
+    job = None
+    proc = None
     spawn_started = time.monotonic()
     try:
         job = _JobObject()
         proc = _SuspendedProcess(cmd, PROJECT_ROOT, rundir / "stdout.txt",
-                                 rundir / "stderr.txt")
+                                 rundir / "stderr.txt", env_block=env_block)
         try:
             job.assign(proc.handle)
         except _JobError:
-            # Never resumed: no task/model execution, no descendants possible.
             proc.kill()
             proc.wait(timeout=10)
             spawn_info["cleanup_status"] = "assignment_failed"
-            return _base_error_run("harness-error",
-                                   "job_assignment_failed"), spawn_info
+            return _base_error_run("harness-error", "job_assignment_failed"), spawn_info
         spawn_info["job_assigned"] = True
         proc.resume()
-
-        # Startup barrier (second layer): the resumed worker waits before
-        # any setup that can start children until released. The barrier is
-        # bounded by the SAME overall worker deadline (startup included);
-        # only the bounded termination grace below sits outside it.
         deadline = spawn_started + timeout_s
         ready_path = Path(barrier["ready"])
         while not ready_path.exists():
             if proc.poll() is not None:
                 spawn_info["cleanup_status"] = "worker_exited_before_ready"
-                return _base_error_run("harness-error",
-                                       "worker_exited_before_ready"), spawn_info
+                return _base_error_run("harness-error", "worker_exited_before_ready"), spawn_info
             if time.monotonic() > deadline:
                 job.terminate()
                 proc.wait(timeout=10)
                 spawn_info["cleanup_status"] = "barrier_ready_timeout"
-                return _base_error_run("harness-error",
-                                       "startup_barrier_not_ready"), spawn_info
+                return _base_error_run("harness-error", "startup_barrier_not_ready"), spawn_info
             time.sleep(0.05)
         Path(barrier["release"]).write_text("release", encoding="utf-8")
-        spawn_info["startup_ms"] = round(
-            (time.monotonic() - spawn_started) * 1000, 1)
-
+        spawn_info["startup_ms"] = round((time.monotonic() - spawn_started) * 1000, 1)
         remaining = max(0.0, deadline - time.monotonic())
         try:
             proc.wait(timeout=remaining)
@@ -574,17 +589,13 @@ def _default_spawn(ctx: dict, cmd_prefix: Optional[list] = None):
                 except Exception:
                     pass
             active = job.active_processes()
-            spawn_info["cleanup_status"] = (
-                "terminated" if ok and active == 0 else "unverified")
+            spawn_info["cleanup_status"] = ("terminated" if ok and active == 0 else "unverified")
             spawn_info["active_after_terminate"] = active
-            return _base_error_run("timeout",
-                                   "worker_wall_timeout"), spawn_info
+            return _base_error_run("timeout", "worker_wall_timeout"), spawn_info
         active = job.active_processes()
         spawn_info["active_before_close"] = active
-        spawn_info["cleanup_status"] = (
-            "verified" if active == 0 else "unverified")
+        spawn_info["cleanup_status"] = ("verified" if active == 0 else "unverified")
     except _JobError as exc:
-        # Secondary failures here must not bypass the final report.
         if proc is not None:
             try:
                 alive = proc.poll() is None
@@ -617,7 +628,6 @@ def _default_spawn(ctx: dict, cmd_prefix: Optional[list] = None):
                 close_failed = True
         if close_failed and spawn_info.get("cleanup_status") == "verified":
             spawn_info["cleanup_status"] = "unverified"
-
     run_json = rundir / "run.json"
     if run_json.exists():
         try:
@@ -625,6 +635,28 @@ def _default_spawn(ctx: dict, cmd_prefix: Optional[list] = None):
         except Exception as exc:
             return _base_error_run("harness-error", repr(exc)), spawn_info
     return _base_error_run("harness-error", "no run.json produced"), spawn_info
+
+
+def spawn_pilot_worker(ctx: dict):
+    """Production pilot spawn - fixed module, no arbitrary prefix."""
+    cmd = [sys.executable, "-m", "harness.model_pilot", "--run-one"]
+    env_block = _pilot_env_block()
+    return _run_owned_worker(ctx, cmd, env_block=env_block)
+
+
+def _default_spawn(ctx: dict, cmd_prefix: Optional[list] = None):
+    """Real subprocess spawn: suspended create, job assign, resume, barrier.
+
+    ``cmd_prefix`` is an internal Python-level test seam only (never set by
+    the CLI, a spec, or the environment): when present it replaces the
+    ``python -m harness.model_compare --run-one`` prefix, e.g. with a
+    test-generated tripwire bootstrap.
+    """
+    if cmd_prefix:
+        cmd = list(cmd_prefix)
+        return _run_owned_worker(ctx, cmd, env_block=None)
+    cmd = [sys.executable, "-m", "harness.model_compare", "--run-one"]
+    return _run_owned_worker(ctx, cmd, env_block=None)
 
 
 # --------------------------------------------------------------------------- #
@@ -726,6 +758,14 @@ def _accounting_status(run: dict) -> tuple[bool, list]:
 
 def _accounting_complete(run: dict) -> bool:
     return _accounting_status(run)[0]
+
+
+def validate_paid_accounting(run: dict):
+    return _accounting_detail(run)
+
+
+def paid_cost_summary(run: dict):
+    return _cost_summary(run)
 
 
 def _cost_summary(run: dict) -> dict:

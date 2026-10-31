@@ -425,6 +425,43 @@ def _make_smoke_dotenv_fallback(spec: dict):
     return make_dotenv_fallback(_LEXICAL_ROOT)
 
 
+def wait_startup_barrier(spec: dict, out_dir: Path, timeout_s: float = 30.0):
+    barrier = spec.get("_startup_barrier")
+    if barrier is None:
+        return None
+    # Validate derived owned paths - no arbitrary spec paths
+    if not isinstance(barrier, dict) or set(barrier.keys()) != {"ready", "release"}:
+        return "startup_barrier_invalid_shape"
+    try:
+        ready = Path(barrier["ready"])
+        release = Path(barrier["release"])
+        # Must be under out_dir (lexical check before resolve)
+        out_resolved = Path(out_dir).resolve()
+        # Check lexical containment
+        for p in (ready, release):
+            # must be inside out_dir lexically (no escape)
+            try:
+                p.resolve().relative_to(out_resolved)
+            except Exception:
+                return "startup_barrier_path_escape"
+        # Must have exact names
+        if ready.name != "barrier-ready.json" or release.name != "barrier-release":
+            return "startup_barrier_name_mismatch"
+    except Exception:
+        return "startup_barrier_invalid_paths"
+    import time as _time
+    try:
+        ready.write_text(json.dumps({"pid": __import__("os").getpid()}), encoding="utf-8")
+    except Exception:
+        return "startup_barrier_write_failed"
+    deadline = _time.monotonic() + timeout_s
+    while not release.exists():
+        if _time.monotonic() > deadline:
+            return "startup_barrier_timeout"
+        _time.sleep(0.05)
+    return None
+
+
 def run_one_cli(argv) -> int:
     p = argparse.ArgumentParser(description="Run one model arm")
     p.add_argument("--spec", required=True)
@@ -457,27 +494,15 @@ def run_one_cli(argv) -> int:
                           "declared_outcome": None}))
         return 0
 
-    # Owned startup barrier (Brief 7 smoke only): wait before any setup that
-    # can start store/browser children until the parent has assigned the
-    # worker to its job object and released it.
-    barrier = spec.get("_startup_barrier")
-    if barrier is not None:
-        import time as _time
-        ready = Path(barrier["ready"])
-        release = Path(barrier["release"])
-        ready.write_text(json.dumps({"pid": __import__("os").getpid()}),
-                         encoding="utf-8")
-        deadline = _time.monotonic() + 30.0
-        while not release.exists():
-            if _time.monotonic() > deadline:
-                run = _error_run("harness-error", "startup_barrier_timeout")
-                (Path(args.out) / "run.json").write_text(
-                    json.dumps(run, indent=2, default=str), encoding="utf-8")
-                print(json.dumps({"arm": run.get("arm"),
-                                  "execution_status": run["execution_status"],
-                                  "declared_outcome": None}))
-                return 0
-            _time.sleep(0.05)
+    err = wait_startup_barrier(spec, Path(args.out))
+    if err is not None:
+        run = _error_run("harness-error", err)
+        (Path(args.out) / "run.json").write_text(
+            json.dumps(run, indent=2, default=str), encoding="utf-8")
+        print(json.dumps({"arm": run.get("arm"),
+                          "execution_status": run["execution_status"],
+                          "declared_outcome": None}))
+        return 0
 
     try:
         dotenv_fallback = _make_smoke_dotenv_fallback(spec) \
