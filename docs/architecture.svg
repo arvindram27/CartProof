@@ -1,0 +1,156 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1052" font-family="Segoe UI, Arial, sans-serif">
+  <rect x="0" y="0" width="1240" height="1052" fill="#ffffff"/>
+  <text x="24" y="38" font-size="23" font-weight="bold" fill="#111827">CartProof pilot, as built (main, 2026-10-31)</text>
+  <text x="24" y="62" font-size="12.5" fill="#374151">Fixed, budgeted model-profile comparison over pinned tasks: gated live transport, independent scoring, frozen evidence. Stage 1 evidence is offline (FAKE injected transport).</text>
+
+  <!-- band template: background + label -->
+  <!-- ENTRY POINTS -->
+  <rect x="16" y="84" width="1208" height="118" rx="10" fill="#eef4ff"/>
+  <text x="28" y="106" font-size="13" font-weight="bold" fill="#1d4ed8">ENTRY POINTS (CLI / LAUNCHERS)</text>
+  <!-- MANIFEST + GATES -->
+  <rect x="16" y="232" width="1208" height="118" rx="10" fill="#f3efff"/>
+  <text x="28" y="254" font-size="13" font-weight="bold" fill="#6d28d9">MANIFEST + GATES</text>
+  <!-- PILOT RUNNER -->
+  <rect x="16" y="380" width="1208" height="148" rx="10" fill="#eafaf1"/>
+  <text x="28" y="402" font-size="13" font-weight="bold" fill="#047857">PILOT RUNNER</text>
+  <!-- SCORING -->
+  <rect x="16" y="558" width="1208" height="118" rx="10" fill="#fff7e8"/>
+  <text x="28" y="580" font-size="13" font-weight="bold" fill="#b45309">SCORING</text>
+  <!-- EVIDENCE + PUBLICATION -->
+  <rect x="16" y="706" width="1208" height="118" rx="10" fill="#fdf2f8"/>
+  <text x="28" y="728" font-size="13" font-weight="bold" fill="#be185d">EVIDENCE + PUBLICATION</text>
+  <!-- OUTSIDE -->
+  <rect x="16" y="854" width="1208" height="118" rx="10" fill="#f3f4f6" stroke="#9ca3af" stroke-dasharray="7 5"/>
+  <text x="28" y="876" font-size="13" font-weight="bold" fill="#4b5563">OUTSIDE (GATED)</text>
+
+  <!-- arrows between bands -->
+  <g stroke="#374151" stroke-width="2" fill="#374151">
+    <line x1="620" y1="202" x2="620" y2="226"/><polygon points="614,224 626,224 620,234"/>
+    <line x1="620" y1="350" x2="620" y2="374"/><polygon points="614,372 626,372 620,382"/>
+    <line x1="620" y1="528" x2="620" y2="552"/><polygon points="614,550 626,550 620,560"/>
+    <line x1="620" y1="676" x2="620" y2="700"/><polygon points="614,698 626,698 620,708"/>
+  </g>
+  <!-- gated live edge: runner -> outside, dashed along right margin -->
+  <path d="M 1210 528 L 1210 900" stroke="#b91c1c" stroke-width="2" stroke-dasharray="6 5" fill="none"/>
+  <polygon points="1204,898 1216,898 1210,910" fill="#b91c1c"/>
+  <text x="1208" y="846" font-size="11" fill="#b91c1c" text-anchor="end">gated live path — separate approval only</text>
+
+  <!-- ENTRY boxes -->
+  <g>
+    <rect x="28" y="116" width="380" height="72" rx="8" fill="#ffffff" stroke="#1d4ed8"/>
+    <text x="42" y="140" font-size="13" font-weight="bold" fill="#111827">Pilot CLI — harness/model_pilot.py</text>
+    <text x="42" y="158" font-size="10.5" fill="#374151">main: --stage / --live / --preflight-only;</text>
+    <text x="42" y="172" font-size="10.5" fill="#374151">--run-one is the per-cell worker entry.</text>
+
+    <rect x="430" y="116" width="380" height="72" rx="8" fill="#ffffff" stroke="#1d4ed8"/>
+    <text x="444" y="140" font-size="13" font-weight="bold" fill="#111827">Foundation runner — harness/run_task.py</text>
+    <text x="444" y="158" font-size="10.5" fill="#374151">Boots store + control on 127.0.0.1, applies a</text>
+    <text x="444" y="172" font-size="10.5" fill="#374151">fault, runs the scripted actor (no model).</text>
+
+    <rect x="832" y="116" width="380" height="72" rx="8" fill="#ffffff" stroke="#1d4ed8"/>
+    <text x="846" y="140" font-size="13" font-weight="bold" fill="#111827">Test launchers + tripwire</text>
+    <text x="846" y="158" font-size="10.5" fill="#374151">Isolated pytest launchers; sitecustomize tripwire</text>
+    <text x="846" y="172" font-size="10.5" fill="#374151">blocks network and live-client paths offline.</text>
+  </g>
+
+  <!-- GATES boxes -->
+  <g>
+    <rect x="28" y="264" width="284" height="72" rx="8" fill="#ffffff" stroke="#6d28d9"/>
+    <text x="42" y="288" font-size="13" font-weight="bold" fill="#111827">harness/pilot_manifest.py</text>
+    <text x="42" y="306" font-size="10.5" fill="#374151">Manifest of record: limits, profiles,</text>
+    <text x="42" y="320" font-size="10.5" fill="#374151">pinned tasks / prices, fixed stages.</text>
+
+    <rect x="330" y="264" width="284" height="72" rx="8" fill="#ffffff" stroke="#6d28d9"/>
+    <text x="344" y="288" font-size="13" font-weight="bold" fill="#111827">Git preflight</text>
+    <text x="344" y="306" font-size="10.5" fill="#374151">HEAD pinned to BASE_HEAD eb06f4f;</text>
+    <text x="344" y="320" font-size="10.5" fill="#374151">seven-file dirty allowance, else refuse.</text>
+
+    <rect x="632" y="264" width="284" height="72" rx="8" fill="#ffffff" stroke="#6d28d9"/>
+    <text x="646" y="288" font-size="13" font-weight="bold" fill="#111827">Cost gate</text>
+    <text x="646" y="306" font-size="10.5" fill="#374151">$3 review threshold; $5 planning allowance</text>
+    <text x="646" y="320" font-size="10.5" fill="#374151">incl. prior smoke estimate $0.0132445.</text>
+
+    <rect x="934" y="264" width="278" height="72" rx="8" fill="#ffffff" stroke="#6d28d9"/>
+    <text x="948" y="288" font-size="13" font-weight="bold" fill="#111827">Stage-2 receipt seam</text>
+    <text x="948" y="306" font-size="10.5" fill="#374151">UNSET (None). Stage 2 is not admitted</text>
+    <text x="948" y="320" font-size="10.5" fill="#374151">until a Stage 1 batch is accepted.</text>
+  </g>
+
+  <!-- RUNNER boxes -->
+  <g>
+    <rect x="28" y="412" width="284" height="100" rx="8" fill="#ffffff" stroke="#047857"/>
+    <text x="42" y="436" font-size="13" font-weight="bold" fill="#111827">Stage loop — model_pilot.py</text>
+    <text x="42" y="454" font-size="10.5" fill="#374151">Fixed cell order, per-cell specs,</text>
+    <text x="42" y="468" font-size="10.5" fill="#374151">pre-spawn / spawn phases, halt and</text>
+    <text x="42" y="482" font-size="10.5" fill="#374151">finalization, frozen batch writes.</text>
+
+    <rect x="330" y="412" width="284" height="100" rx="8" fill="#ffffff" stroke="#047857"/>
+    <text x="344" y="436" font-size="13" font-weight="bold" fill="#111827">Worker spawn — model_smoke.py</text>
+    <text x="344" y="454" font-size="10.5" fill="#374151">spawn_pilot_worker runs one cell per</text>
+    <text x="344" y="468" font-size="10.5" fill="#374151">worker with barrier + 360 s timeout;</text>
+    <text x="344" y="482" font-size="10.5" fill="#374151">cleanup must verify or the cell halts.</text>
+
+    <rect x="632" y="412" width="284" height="100" rx="8" fill="#ffffff" stroke="#047857"/>
+    <text x="646" y="436" font-size="13" font-weight="bold" fill="#111827">BudgetedModelClient</text>
+    <text x="646" y="454" font-size="10.5" fill="#374151">Per-cell: 12 calls / 20,000 tokens /</text>
+    <text x="646" y="468" font-size="10.5" fill="#374151">4,096 output. Reserves per call and</text>
+    <text x="646" y="482" font-size="10.5" fill="#374151">latches on overrun; smoke_guard accounts.</text>
+
+    <rect x="934" y="412" width="278" height="100" rx="8" fill="#ffffff" stroke="#047857"/>
+    <text x="948" y="436" font-size="13" font-weight="bold" fill="#111827">Meta transport + key loading</text>
+    <text x="948" y="454" font-size="10.5" fill="#374151">meta_client fails closed, no retries.</text>
+    <text x="948" y="468" font-size="10.5" fill="#374151">key: env MODEL_API_KEY first,</text>
+    <text x="948" y="482" font-size="10.5" fill="#374151">env_loader fallback; sanitized errors only.</text>
+  </g>
+
+  <!-- SCORING boxes -->
+  <g>
+    <rect x="28" y="590" width="284" height="72" rx="8" fill="#ffffff" stroke="#b45309"/>
+    <text x="42" y="614" font-size="13" font-weight="bold" fill="#111827">Independent measurement</text>
+    <text x="42" y="632" font-size="10.5" fill="#374151">model_compare.measure_worker_run vs</text>
+    <text x="42" y="646" font-size="10.5" fill="#374151">persisted DB (evaluate, snapshots).</text>
+
+    <rect x="330" y="590" width="284" height="72" rx="8" fill="#ffffff" stroke="#b45309"/>
+    <text x="344" y="614" font-size="13" font-weight="bold" fill="#111827">model_metrics enrichment</text>
+    <text x="344" y="632" font-size="10.5" fill="#374151">enrich_model_run fields; the declared</text>
+    <text x="344" y="646" font-size="10.5" fill="#374151">outcome is never substituted.</text>
+
+    <rect x="632" y="590" width="580" height="72" rx="8" fill="#ffffff" stroke="#b45309"/>
+    <text x="646" y="614" font-size="13" font-weight="bold" fill="#111827">Scoring readout (batch.json + summary.md)</text>
+    <text x="646" y="632" font-size="10.5" fill="#374151">Declared COMPLETE split verified / known-false / unverified. Unreadable records count as</text>
+    <text x="646" y="646" font-size="10.5" fill="#374151">evaluated_unreadable, pre-evaluation halts separately; COMPLETE only when all records readable.</text>
+  </g>
+
+  <!-- EVIDENCE boxes -->
+  <g>
+    <rect x="28" y="738" width="284" height="72" rx="8" fill="#ffffff" stroke="#be185d"/>
+    <text x="42" y="762" font-size="13" font-weight="bold" fill="#111827">Per-cell records — cells/&lt;id&gt;/</text>
+    <text x="42" y="780" font-size="10.5" fill="#374151">run.json, evaluated.json, secret-scan.txt</text>
+    <text x="42" y="794" font-size="10.5" fill="#374151">(run.db stays out of the export).</text>
+
+    <rect x="330" y="738" width="284" height="72" rx="8" fill="#ffffff" stroke="#be185d"/>
+    <text x="344" y="762" font-size="13" font-weight="bold" fill="#111827">Frozen batch</text>
+    <text x="344" y="780" font-size="10.5" fill="#374151">batch.json, ledger.json, summary.md</text>
+    <text x="344" y="794" font-size="10.5" fill="#374151">frozen before publication.</text>
+
+    <rect x="632" y="738" width="284" height="72" rx="8" fill="#ffffff" stroke="#be185d"/>
+    <text x="646" y="762" font-size="13" font-weight="bold" fill="#111827">Export</text>
+    <text x="646" y="780" font-size="10.5" fill="#374151">export/ with manifest hashes; failed</text>
+    <text x="646" y="794" font-size="10.5" fill="#374151">checks withhold into a halted package.</text>
+
+    <rect x="934" y="738" width="278" height="72" rx="8" fill="#ffffff" stroke="#be185d"/>
+    <text x="948" y="762" font-size="13" font-weight="bold" fill="#111827">Attempt latch</text>
+    <text x="948" y="780" font-size="10.5" fill="#374151">Reserved / may-start / recorded snapshots</text>
+    <text x="948" y="794" font-size="10.5" fill="#374151">plus EXPORT_OUTCOME.json.</text>
+  </g>
+
+  <!-- OUTSIDE box -->
+  <rect x="28" y="886" width="1184" height="72" rx="8" fill="#ffffff" stroke="#b91c1c" stroke-dasharray="7 5"/>
+  <text x="42" y="910" font-size="13" font-weight="bold" fill="#111827">Meta Model API — api.meta.ai/v1 (muse-spark-1.3, muse-wonder-1.0)</text>
+  <text x="42" y="928" font-size="10.5" fill="#374151">GATED: reached only through the fail-closed live path above. NOT called by the Stage 1 comparison; its evidence is offline FAKE injected transport. A prior live smoke exists on record ($0.0132445 estimate).</text>
+  <text x="42" y="942" font-size="10.5" fill="#374151">Dollar figures are local estimates at published 2026-10-31 prices, not billing caps; Meta offers no provider-side hard spending cap.</text>
+
+  <text x="24" y="1000" font-size="11" fill="#374151">Tests: strict 123 passed / 5 skipped (Windows symlink rows UNVERIFIED); regression 76 passed / 1 deselected — two separate saved suite runs, never summed.</text>
+  <text x="24" y="1018" font-size="11" fill="#374151">Outside reviewed scope: harness.metrics and the MC arm (not reviewed). One trial per cell; traversal complete is not task success.</text>
+  <text x="24" y="1036" font-size="11" fill="#6b7280">Source: harness/ pilot_manifest, model_pilot, model_smoke, model_compare, evaluate, model_metrics, snapshots; agents/ model_client, meta_client, env_loader, smoke_guard.</text>
+</svg>

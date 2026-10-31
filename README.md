@@ -1,14 +1,34 @@
-# CartProof — offline foundation
+# CartProof — offline foundation and gated model pilot
 
-The first phase of CartProof, a verification-and-recovery layer for shopping
-agents. This phase builds only the local foundation:
+CartProof is a verification-and-recovery layer for shopping agents. The
+repository contains:
 
 - a **fault-injectable mock storefront** (FastAPI + SQLite + Jinja2),
 - a **Playwright browser adapter** that acts on and observes the store,
-- a **scripted (non-LLM) actor** that assembles a cart through the adapter.
+- a **scripted (non-LLM) actor** that assembles a cart through the adapter,
+- an intent-ledger **verification layer** and an opt-in bounded **recovery
+  layer** for the owned mock store, and
+- a **gated model pilot** (`harness/model_pilot.py`) that can run a fixed,
+  budgeted comparison of model profiles against pinned tasks, with
+  independent scoring and frozen evidence.
 
-Everything runs on your machine. No model calls, no API keys or secrets, no
-external services, no git remotes, no checkout/payment flow.
+The foundation runs entirely on your machine. The model pilot's live
+transport is separately gated (see "Model pilot" below); the pilot evidence
+in this repository's review record is offline and does not come from live
+model calls.
+
+## Status
+
+- A prior live smoke exists on record, with a prior smoke cost estimate of
+  $0.0132445. It is therefore not accurate to say this project has never
+  made live calls.
+- The new 4-cell Stage 1 comparison (2 Spark + 2 Wonder cells) has **not**
+  been live-validated. Its evidence is offline, produced with FAKE injected
+  transport through the real pilot cell path.
+- One trial per cell. The pilot readout is a plumbing/scoring readout of
+  those cells only, not a statistical or model-capability claim.
+- Stage 2 is not admitted: its predecessor-receipt seam is UNSET
+  (`ACCEPTED_STAGE1_RECEIPT_ID` / `ACCEPTED_STAGE1_MANIFEST_ID` are `None`).
 
 ## Layout
 
@@ -17,8 +37,8 @@ cartproof/
   requirements.txt
   store/           # FastAPI app, SQLite schema, faults, templates, seed catalog
   adapter/         # Playwright actions + observations + Evidence
-  agents/          # scripted_actor.py (deterministic cart assembly)
-  harness/         # run_task.py (boots store + control, applies fault, runs actor)
+  agents/          # scripted actor, budgeted model client, Meta transport, env loader
+  harness/         # run_task.py (foundation runner), model pilot + scoring harness
   examples/        # task1.json
   tests/           # pytest suite
 ```
@@ -61,6 +81,91 @@ stdout, and shuts down.
 ```powershell
 .\.venv\Scripts\python -m pytest
 ```
+
+## Model pilot
+
+Architecture diagram: [`docs/architecture.svg`](docs/architecture.svg).
+
+The pilot compares two fixed profiles — `spark-medium` (`muse-spark-1.3`)
+and `wonder-medium` (`muse-wonder-1.0`) — over pinned tasks in a fixed
+cell order, defined in `harness/pilot_manifest.py` (the manifest of
+record: limits, profiles, tasks with pinned hashes, stages, and a pinned
+price table). Stage 1 is 4 CA-arm cells (2 Spark + 2 Wonder); Stage 2
+stays UNSET until a Stage 1 batch is reviewed and accepted.
+
+Manifest prices were verified against
+https://dev.meta.ai/docs/pricing-rate-limits on 2026-10-31.
+
+### Gates and budgets
+
+- Per-cell budgets: 12 calls / 20,000 local tokens / 4,096 output tokens,
+  360 s worker timeout, 2,000 ms settling. `BudgetedModelClient`
+  (`agents/model_client.py`) reserves budget per call and latches on
+  overrun; uncertainty counts against the budget.
+- Cost gate: a $3 new-pilot review threshold and a $5 total planning
+  allowance that includes the prior smoke estimate ($0.0132445). The
+  Stage 1 local allowance is $0.97 (2 Spark + 2 Wonder cells at the
+  manifest's per-profile allowances).
+- Git preflight: live runs pin `BASE_HEAD`
+  `eb06f4f93f3ad7f7a0bb1de7cd2d1451a360a6b0` with a seven-file dirty
+  allowance for the pilot sources; any other dirty path refuses the run.
+  This publication commit moves the repository HEAD off the pinned
+  BASE_HEAD, so the live preflight will refuse future live runs until a
+  separate gate-alignment review. Publishing is not live approval.
+- Transport: `agents/meta_client.py` fails closed before reading the key
+  unless every live gate passes, and never retries. The API key comes from
+  the `MODEL_API_KEY` environment variable first; the sanitized loader in
+  `agents/env_loader.py` is a fallback used only when it is absent
+  (failures surface as fixed categories, never values).
+- Write safety: the harness-enumerated stage and control mutations
+  (reservation latch, export copies, batch staging and publication,
+  control-root handling) use leaf and ancestor validation. Batches freeze
+  `batch.json`, `ledger.json` and `summary.md` before publication, and
+  export withholds anything that fails its checks.
+
+### Scoring readout
+
+Each cell's worker output is measured independently
+(`harness/model_compare.py`, `harness/evaluate.py`,
+`harness/model_metrics.py`, `harness/snapshots.py`); the model's declared
+outcome is never substituted for the measurement. The frozen readout
+splits declared COMPLETE into verified / known-false / unverified, and
+reports per-profile counts beside the existing cost fields.
+`correct_clarification` is reported as a behavior count, distinct from
+task appropriateness.
+
+Readout completeness is explicit: a cell whose evaluated record should
+exist but cannot be read is counted as `evaluated_unreadable` (never
+silently scored as zero), a cell with no worker output is counted
+separately as `halted_before_evaluation`, and the batch readout status is
+`COMPLETE` only when every evaluated record was readable. Readout
+COMPLETE means the evaluation records were readable; it is not task
+success, and traversal complete is not task success either.
+
+### Test evidence
+
+Two separate saved suite runs (kept separate, never summed), from review
+evidence; independent review of them was byte/hash level, not a re-run:
+
+- Strict suite: 123 passed / 5 skipped. The 5 skips are Windows symlink
+  cases and remain UNVERIFIED in this account.
+- Regression suite: 76 passed / 1 deselected.
+
+### Known limits
+
+- Dollar figures are local estimates at Meta's published 2026-10-31
+  prices. They are NOT billing caps, and Meta offers no provider-side
+  hard spending cap; the budget wrapper is a best-effort fail-closed
+  guard, not a hard token or dollar guarantee.
+- `harness.metrics` and the MC arm are outside the reviewed scope: they
+  were not reviewed, and nothing here asserts whether they are
+  implemented or unimplemented.
+- Windows junction/reparse rows pass; the 5 symbolic-link creation rows
+  are skipped and remain UNVERIFIED in this account.
+- Checks are sequential and non-following; no hostile
+  concurrent-replacement immunity is claimed.
+- Offline test evidence does not authorize or imply any live stage. A
+  live run still needs its own separate approval.
 
 ## Faults
 
@@ -149,5 +254,3 @@ privately create `.env` in the project root containing a single
 `MODEL_API_KEY` assignment line, using a local editor with AI assistance
 disabled. Saving `.env` never authorizes live use; a live smoke still needs
 its own separate approval.
-
-
