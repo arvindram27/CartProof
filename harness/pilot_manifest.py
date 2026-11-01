@@ -67,6 +67,15 @@ TASKS = {
     },
 }
 
+# Fixed offline responses fixture for the no-model dry-run only. This module
+# is inside the reviewed-source digest, so the pin below is reviewed data and
+# the fixture is tamper-evident under the review loop. The live Meta path
+# never reads it. A mismatch refuses; there is no fallback.
+DRY_RUN_FIXTURE = {
+    "path": "eval/model/dev/fake_scripts.json",
+    "sha256": "a902b34903734c055fd954843e4a8c437896fbf1564861512b13b617ea3aa160",
+}
+
 STAGES = {
     1: (
         {"cell_id": "s1-seeded-ca-spark", "task_id": "m-clean-seeded", "arm": "CA", "profile": "spark-medium"},
@@ -89,6 +98,20 @@ STAGES = {
 # Predecessor receipt seam - UNSET until a Stage1 batch is reviewed and accepted
 ACCEPTED_STAGE1_RECEIPT_ID: str | None = None
 ACCEPTED_STAGE1_MANIFEST_ID: str | None = None
+
+# Audited attempt-successor authority. UNSET by default: a consumed attempt
+# still refuses with attempt_already_reserved. When set, this reviewed value
+# names exactly one prior attempt and the terminal states it accepts. Any
+# change here is a reviewed-source change (this module is in the digest).
+#
+# Shape:
+#   {
+#       "grant_id": str,
+#       "stage": int,
+#       "prior_attempt_id": str,          # 16 lowercase hex chars
+#       "accepted_prior_states": (str, ...),  # subset of complete/halted/blocked
+#   }
+SUCCESSOR_GRANT: dict | None = None
 # conservative allowances per profile for gate arithmetic
 PROFILE_ALLOWANCE = {
     "spark-medium": round(LIMITS["token_budget"] * 4.25 / 1_000_000, 8),  # output price

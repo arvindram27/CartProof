@@ -274,9 +274,14 @@ def _stage_of_cell(cell: dict) -> int:
             return stage
     raise PilotError("cell_not_in_manifest")
 
-def _validate_script_types(script: dict):
-    if not isinstance(script, dict) or set(script.keys()) != {"budget", "client"}:
+def _validate_script_types(script: dict, allow_responses: bool = False):
+    keys = {"budget", "client"}
+    if allow_responses:
+        keys = keys | {"responses"}
+    if not isinstance(script, dict) or set(script.keys()) != keys:
         raise PilotError("script_shape_invalid")
+    if allow_responses and not isinstance(script.get("responses"), list):
+        raise PilotError("script_responses_invalid")
     budget = script["budget"]
     if not isinstance(budget, dict) or set(budget.keys()) != {"max_calls", "token_budget", "max_output_tokens"}:
         raise PilotError("budget_shape_invalid")
@@ -312,7 +317,10 @@ def _validate_script_types(script: dict):
         if not _is_num(v) or v < 0:
             raise PilotError(f"price_rate_invalid:{k}")
 
-def build_cell_spec(cell: dict, task: dict, barrier=None) -> dict:
+def build_cell_spec(cell: dict, task: dict, barrier=None, transport: str = "meta",
+                    responses: list | None = None) -> dict:
+    if transport not in ("meta", "fake"):
+        raise PilotError("transport_invalid")
     stage = _stage_of_cell(cell)
     prof = mft.PROFILES[cell["profile"]]
     script = {
@@ -328,6 +336,10 @@ def build_cell_spec(cell: dict, task: dict, barrier=None) -> dict:
             "price_table": json.loads(json.dumps(prof["price_table"])),
         },
     }
+    if transport == "fake":
+        if not isinstance(responses, list):
+            raise PilotError("dry_run_responses_unavailable")
+        script["responses"] = copy.deepcopy(responses)
     spec = {
         "manifest_id": mft.MANIFEST_ID,
         "protocol_version": mft.PROTOCOL_VERSION,
@@ -342,18 +354,65 @@ def build_cell_spec(cell: dict, task: dict, barrier=None) -> dict:
         "arm": cell["arm"],
         "trial": 1,
         "fake_script": script,
-        "transport": "meta",
-        "allow_live": True,
+        "transport": transport,
+        "allow_live": transport == "meta",
     }
     if barrier is not None:
         spec["_startup_barrier"] = barrier
     return spec
 
-def _canonical_spec_for_cell(cell: dict, root: Path, barrier=None):
+def _canonical_spec_for_cell(cell: dict, root: Path, barrier=None,
+                             transport: str = "meta",
+                             responses: list | None = None):
     task, _, _ = _read_pinned_task(root, cell["task_id"])
-    return build_cell_spec(cell, task, barrier=barrier), task
+    return build_cell_spec(cell, task, barrier=barrier, transport=transport,
+                           responses=responses), task
 
-def validate_worker_spec(spec: dict, root: Path) -> tuple[dict, dict]:
+def _load_dry_run_responses(root: Path, cell: dict) -> list:
+    """Load the reviewed offline responses for one dry-run cell.
+
+    The fixture is hash-pinned in the digest-covered manifest (the same style
+    as the pinned task files) and read with the same containment rules. A
+    missing, replaced, malformed, or unpinned fixture refuses; there is no
+    fallback to a real client and no live path consults it.
+    """
+    pin = mft.DRY_RUN_FIXTURE
+    if (not isinstance(pin, dict)
+            or set(pin.keys()) != {"path", "sha256"}
+            or not isinstance(pin.get("path"), str) or not pin["path"]
+            or not isinstance(pin.get("sha256"), str)
+            or not re.fullmatch(r"[0-9a-f]{64}", pin["sha256"])):
+        raise PilotError("dry_run_fixture_pin_invalid")
+    dev_root = (Path(root) / "eval" / "model" / "dev").resolve()
+    try:
+        _validate_ancestor_chain(Path(root), Path(root) / pin["path"])
+        fixture = Path(root).resolve() / pin["path"]
+        if _is_link(fixture) or not fixture.is_file():
+            raise PilotError("dry_run_responses_unavailable")
+        if "frozen" in fixture.parts:
+            raise PilotError("dry_run_responses_unavailable")
+        if not fixture.resolve().is_relative_to(dev_root):
+            raise PilotError("dry_run_responses_unavailable")
+        raw = fixture.read_bytes()
+    except PilotError:
+        raise
+    except OSError:
+        raise PilotError("dry_run_responses_unavailable")
+    if hashlib.sha256(raw).hexdigest() != pin["sha256"]:
+        raise PilotError("dry_run_fixture_mismatch")
+    try:
+        data = json.loads(raw.decode("utf-8"))
+        responses = data[cell["task_id"]][cell["arm"]]["responses"]
+    except Exception:
+        raise PilotError("dry_run_responses_unavailable")
+    if not isinstance(responses, list) or not responses:
+        raise PilotError("dry_run_responses_unavailable")
+    return responses
+
+def validate_worker_spec(spec: dict, root: Path,
+                         transport: str = "meta") -> tuple[dict, dict]:
+    if transport not in ("meta", "fake"):
+        raise PilotError("transport_invalid")
     if not isinstance(spec, dict):
         raise PilotError("spec_not_object")
     if set(spec.keys()) - _ALLOWED_SPEC_KEYS or "smoke" in spec:
@@ -370,9 +429,9 @@ def validate_worker_spec(spec: dict, root: Path) -> tuple[dict, dict]:
         raise PilotError("pilot_stage_invalid")
     if not _is_int(spec.get("trial")) or spec["trial"] != 1:
         raise PilotError("trial_invalid")
-    if spec.get("transport") != "meta":
+    if spec.get("transport") != transport:
         raise PilotError("transport_invalid")
-    if spec.get("allow_live") is not True:
+    if spec.get("allow_live") is not (transport == "meta"):
         raise PilotError("allow_live_invalid")
     if not isinstance(spec.get("setup"), dict) or set(spec["setup"].keys()) != {"request_text", "seed_lines"}:
         raise PilotError("setup_shape_invalid")
@@ -383,7 +442,8 @@ def validate_worker_spec(spec: dict, root: Path) -> tuple[dict, dict]:
         raise PilotError("barrier_shape_invalid")
     if not isinstance(barrier["ready"], str) or not isinstance(barrier["release"], str):
         raise PilotError("barrier_type_invalid")
-    _validate_script_types(spec.get("fake_script"))
+    _validate_script_types(spec.get("fake_script"),
+                           allow_responses=(transport == "fake"))
     stage = spec["pilot_stage"]
     cells = mft.STAGES.get(stage)
     if not cells:
@@ -393,7 +453,9 @@ def validate_worker_spec(spec: dict, root: Path) -> tuple[dict, dict]:
         raise PilotError("cell_not_in_manifest")
     if spec.get("arm") != cell["arm"]:
         raise PilotError("arm_mismatch")
-    canonical, task = _canonical_spec_for_cell(cell, root, barrier=barrier)
+    responses = _load_dry_run_responses(root, cell) if transport == "fake" else None
+    canonical, task = _canonical_spec_for_cell(
+        cell, root, barrier=barrier, transport=transport, responses=responses)
     for k in _ALLOWED_SPEC_KEYS:
         if spec.get(k) != canonical.get(k):
             raise PilotError(f"spec_mismatch:{k}")
@@ -419,7 +481,8 @@ def _make_pilot_dotenv_fallback(spec: dict, root: Path):
 def _lexical_abs(p: Path) -> str:
     return os.path.normcase(os.path.abspath(str(p)))
 
-def _validate_owned_out(root: Path, out: Path, db: Path, spec_path: Path) -> dict:
+def _validate_owned_out(root: Path, out: Path, db: Path, spec_path: Path,
+                        dry_run: bool = False) -> dict:
     _validate_ancestor_chain(Path(root), Path(out))
     root_abs = _lexical_abs(root)
     var_abs = _lexical_abs(Path(root) / "var")
@@ -429,12 +492,20 @@ def _validate_owned_out(root: Path, out: Path, db: Path, spec_path: Path) -> dic
     if os.path.commonpath([var_abs, out_abs]) != var_abs:
         raise PilotError("out_outside_var")
     rel = os.path.relpath(out_abs, var_abs).split(os.sep)
-    if len(rel) != 3 or rel[1] != "cells" or not rel[0].startswith("model-pilot-stage"):
+    if len(rel) != 3 or rel[1] != "cells":
         raise PilotError("out_not_owned_cell_layout")
-    m = re.fullmatch(r"model-pilot-stage(1|2)-[A-Za-z0-9_.-]+", rel[0])
-    if not m:
-        raise PilotError("out_stage_dir_invalid")
-    stage = int(m.group(1))
+    if dry_run:
+        m = re.fullmatch(r"dry-run-stage1-[A-Za-z0-9_.-]+", rel[0])
+        if not m:
+            raise PilotError("out_stage_dir_invalid")
+        stage = 1
+    else:
+        if rel[0].startswith("dry-run-"):
+            raise PilotError("out_stage_dir_invalid")
+        m = re.fullmatch(r"model-pilot-stage(1|2)-[A-Za-z0-9_.-]+", rel[0])
+        if not m:
+            raise PilotError("out_stage_dir_invalid")
+        stage = int(m.group(1))
     cell_id = rel[2]
     # lexical component checks before resolve
     cur = Path(root)
@@ -475,7 +546,10 @@ def _error_run_pilot(spec: dict, status: str, error: str) -> dict:
 def _write_run(out: Path, run: dict):
     (Path(out) / "run.json").write_text(json.dumps(run, indent=2, default=str), encoding="utf-8")
 
-def pilot_run_one_cli(argv, _root=None, _execute=None):
+def pilot_run_one_cli(argv, _root=None, _execute=None, transport="meta"):
+    if transport not in ("meta", "fake"):
+        print(json.dumps({"error": "transport_invalid"}))
+        return 2
     p = argparse.ArgumentParser()
     p.add_argument("--spec", required=True)
     p.add_argument("--db", required=True)
@@ -490,7 +564,8 @@ def pilot_run_one_cli(argv, _root=None, _execute=None):
     spec_path = Path(args.spec)
     db = Path(args.db)
     try:
-        owned = _validate_owned_out(root, out, db, spec_path)
+        owned = _validate_owned_out(root, out, db, spec_path,
+                                    dry_run=(transport == "fake"))
     except Exception as exc:
         print(json.dumps({"error": str(exc) if isinstance(exc, PilotError) else "path_invalid"}))
         return 2
@@ -510,7 +585,7 @@ def pilot_run_one_cli(argv, _root=None, _execute=None):
         _write_run(out, _error_run_pilot(spec, "harness-error", "barrier_path_mismatch"))
         return 0
     try:
-        validate_worker_spec(spec, root)
+        validate_worker_spec(spec, root, transport=transport)
     except Exception as exc:
         _write_run(out, _error_run_pilot(spec, "harness-error",
                                          str(exc) if isinstance(exc, PilotError) else "spec_validation_failed"))
@@ -522,23 +597,32 @@ def pilot_run_one_cli(argv, _root=None, _execute=None):
         _write_run(out, _error_run_pilot(spec, "harness-error", err))
         return 0
     try:
-        fallback = _make_pilot_dotenv_fallback(spec, root)
+        # The offline path deliberately never reaches the dotenv loader or
+        # constructs a Meta client.
+        fallback = (_make_pilot_dotenv_fallback(spec, root)
+                    if transport == "meta" else None)
         execute_fn = _execute
         if execute_fn is None:
             from harness.model_compare import execute_model_run as execute_fn
         run = execute_fn(spec["setup"], spec["fault"], spec["arm"], spec["trial"],
                          spec["fake_script"], str(db), str(out),
-                         settle_ms=args.settle_ms, transport="meta",
-                         allow_live=True, smoke_guard=True,
+                         settle_ms=args.settle_ms, transport=transport,
+                         allow_live=(transport == "meta"), smoke_guard=True,
                          dotenv_fallback=fallback)
         run["pilot_cell_id"] = spec["pilot_cell_id"]
         run["pilot_manifest_id"] = spec["manifest_id"]
-        run["transport_label"] = "LIVE (pilot, paid attempt)"
+        run["transport_label"] = ("LIVE (pilot, paid attempt)"
+                                  if transport == "meta"
+                                  else "FAKE (dry-run, offline)")
     except Exception as exc:
-        from agents.meta_client import MetaConfigError
-        status = "harness-error" if isinstance(exc, MetaConfigError) else "crash"
-        run = _error_run_pilot(spec, status,
-                               str(exc) if isinstance(exc, MetaConfigError) else traceback.format_exc())
+        if transport == "meta":
+            from agents.meta_client import MetaConfigError
+            status = "harness-error" if isinstance(exc, MetaConfigError) else "crash"
+            run = _error_run_pilot(
+                spec, status,
+                str(exc) if isinstance(exc, MetaConfigError) else traceback.format_exc())
+        else:
+            run = _error_run_pilot(spec, "crash", traceback.format_exc())
     _write_run(out, run)
     print(json.dumps({"arm": run.get("arm"), "execution_status": run.get("execution_status")}))
     return 0
@@ -704,6 +788,169 @@ def _derive_allowance(stage: int) -> float:
         total += mft.PROFILE_ALLOWANCE[cell["profile"]]
     return round(total, 8)
 
+_TERMINAL_ATTEMPT_STATES = ("complete", "halted", "blocked")
+_SUCCESSOR_GRANT_KEYS = {"grant_id", "stage", "prior_attempt_id",
+                         "accepted_prior_states"}
+_ATTEMPT_ID_RE = re.compile(r"^[0-9a-f]{16}$")
+_SUCCESSOR_GUARD_RE = re.compile(r"^successor-claim-[0-9a-f]{16}\.guard$")
+
+def _successor_guard_path(stage_dir: Path, grant: dict) -> Path:
+    """Deterministic per-grant guard leaf (the grant id is hashed, never used
+    as a raw filename)."""
+    digest = hashlib.sha256(grant["grant_id"].encode("utf-8")).hexdigest()[:16]
+    return stage_dir / f"successor-claim-{digest}.guard"
+
+def _successor_claim(stage_dir: Path, grant: dict) -> str:
+    """Classify the exclusive successor guard for one reviewed grant.
+
+    Returns "absent", "complete", or "incomplete". "complete" means the guard
+    was taken and exactly one readable reservation matching this grant exists.
+    "incomplete" means the guard was taken but no complete successor is
+    present - the crash/partial case that must refuse closed. Read-only.
+    """
+    guard = _successor_guard_path(stage_dir, grant)
+    try:
+        kind = _inspect_leaf(guard)
+    except PilotError:
+        raise PilotError("successor_guard_unreadable")
+    if kind not in ("missing", "regular_file"):
+        raise PilotError("successor_guard_unreadable")
+    try:
+        entries = list(stage_dir.iterdir())
+    except OSError:
+        raise PilotError("successor_guard_unreadable")
+    matches = []
+    for entry in entries:
+        if entry.name == "stage.latch" or _SUCCESSOR_GUARD_RE.fullmatch(entry.name):
+            continue
+        try:
+            if _inspect_leaf(entry) != "directory":
+                continue
+            rpath = entry / "reservation.json"
+            if _inspect_leaf(rpath) != "regular_file":
+                continue
+            rec = json.loads(rpath.read_text(encoding="utf-8"))
+        except (PilotError, OSError, ValueError):
+            continue
+        if not isinstance(rec, dict):
+            continue
+        if rec.get("attempt_id") != entry.name \
+                or rec.get("stage") != grant["stage"] \
+                or rec.get("manifest_id") != mft.MANIFEST_ID:
+            continue
+        if rec.get("successor_grant_id") != grant["grant_id"] \
+                or rec.get("successor_of") != grant["prior_attempt_id"]:
+            continue
+        if not isinstance(rec.get("state"), str):
+            continue
+        matches.append(rec)
+    if kind == "missing":
+        # No guard is only fresh when no reservation already bears this
+        # grant id. A matching reservation without its guard (removed outside
+        # the harness) still counts as taken and refuses, so a grant can never
+        # be redeemed twice.
+        return "complete" if matches else "absent"
+    return "complete" if len(matches) == 1 else "incomplete"
+
+def _validate_successor_grant(stage: int) -> dict:
+    """Validate the reviewed grant shape before it is compared with disk.
+
+    The grant lives in the digest-covered manifest, so a malformed or
+    mismatched grant is a reviewed-source defect, not an operator override.
+    """
+    grant = mft.SUCCESSOR_GRANT
+    if not isinstance(grant, dict) or set(grant.keys()) != _SUCCESSOR_GRANT_KEYS:
+        raise PilotError("successor_grant_invalid")
+    if not isinstance(grant.get("grant_id"), str) or not grant["grant_id"]:
+        raise PilotError("successor_grant_invalid")
+    if not _is_int(grant.get("stage")) or grant["stage"] != stage:
+        raise PilotError("successor_grant_invalid")
+    prior = grant.get("prior_attempt_id")
+    if not isinstance(prior, str) or not _ATTEMPT_ID_RE.fullmatch(prior):
+        raise PilotError("successor_grant_invalid")
+    accepted = grant.get("accepted_prior_states")
+    if not isinstance(accepted, (list, tuple)) or not accepted:
+        raise PilotError("successor_grant_invalid")
+    if any(not isinstance(s, str) or s not in _TERMINAL_ATTEMPT_STATES
+           for s in accepted):
+        raise PilotError("successor_grant_invalid")
+    return grant
+
+def _successor_prior(stage_dir: Path, grant: dict) -> dict:
+    """Validate the grant against the on-disk prior reservation state.
+
+    Read-only: prior attempt files are never modified. Every candidate must
+    be readable and consistent; the grant must name the single latest
+    attempt. That makes a grant usable exactly once (the successor then
+    becomes the latest attempt).
+    """
+    try:
+        entries = list(stage_dir.iterdir())
+    except OSError:
+        raise PilotError("successor_prior_unreadable")
+    candidates = []
+    for entry in entries:
+        if entry.name == "stage.latch":
+            continue
+        if _SUCCESSOR_GUARD_RE.fullmatch(entry.name):
+            # A regular guard file is successor bookkeeping, not an attempt.
+            try:
+                if _inspect_leaf(entry) == "regular_file":
+                    continue
+            except PilotError:
+                raise PilotError("successor_prior_unreadable")
+        try:
+            linked = _is_link(entry)
+        except PilotError:
+            raise PilotError("successor_prior_unreadable")
+        if linked or not entry.is_dir():
+            raise PilotError("successor_prior_ambiguous")
+        candidates.append(entry)
+    if not candidates:
+        raise PilotError("successor_prior_missing")
+    records: dict[str, dict] = {}
+    mtimes: dict[str, int] = {}
+    for adir in candidates:
+        rpath = adir / "reservation.json"
+        try:
+            linked = _is_link(rpath)
+        except PilotError:
+            raise PilotError("successor_prior_unreadable")
+        if linked or not rpath.is_file():
+            raise PilotError("successor_prior_unreadable")
+        try:
+            rec = json.loads(rpath.read_text(encoding="utf-8"))
+        except Exception:
+            raise PilotError("successor_prior_unreadable")
+        if not isinstance(rec, dict):
+            raise PilotError("successor_prior_unreadable")
+        if rec.get("attempt_id") != adir.name \
+                or rec.get("stage") != grant["stage"] \
+                or rec.get("manifest_id") != mft.MANIFEST_ID:
+            raise PilotError("successor_prior_mismatch")
+        if not isinstance(rec.get("state"), str):
+            raise PilotError("successor_prior_unreadable")
+        try:
+            mtimes[adir.name] = adir.stat().st_mtime_ns
+        except OSError:
+            raise PilotError("successor_prior_unreadable")
+        records[adir.name] = rec
+    prior_id = grant["prior_attempt_id"]
+    if prior_id not in records:
+        raise PilotError("successor_prior_missing")
+    latest_mtime = max(mtimes.values())
+    latest = [aid for aid, m in mtimes.items() if m == latest_mtime]
+    if len(latest) != 1:
+        raise PilotError("successor_prior_ambiguous")
+    if latest[0] != prior_id:
+        raise PilotError("successor_prior_mismatch")
+    rec = records[prior_id]
+    if rec["state"] not in _TERMINAL_ATTEMPT_STATES:
+        raise PilotError("successor_prior_not_terminal")
+    if rec["state"] not in grant["accepted_prior_states"]:
+        raise PilotError("successor_prior_state_rejected")
+    return rec
+
 def _reserve_attempt(control_root: Path, stage: int, cells: list[dict],
                      source_digest: str, git_head: str | None = None) -> dict:
     root = _validate_control_root(Path(control_root))
@@ -712,15 +959,56 @@ def _reserve_attempt(control_root: Path, stage: int, cells: list[dict],
     stage_dir.mkdir(parents=True, exist_ok=True)
     _validate_ancestor_chain(root, stage_dir)
     latch = stage_dir / "stage.latch"
+    lineage = {}
     if _inspect_leaf(latch) != "missing":
-        raise PilotError("attempt_already_reserved")
-    try:
-        with open(latch, "x", encoding="utf-8") as f:
-            f.write("consumed\n")
-    except FileExistsError:
-        raise PilotError("attempt_already_reserved")
-    except OSError:
-        raise PilotError("attempt_latch_write_failed")
+        # Default-denied: no reviewed grant means the original refusal.
+        if mft.SUCCESSOR_GRANT is None:
+            raise PilotError("attempt_already_reserved")
+        grant = _validate_successor_grant(stage)
+        claim = _successor_claim(stage_dir, grant)
+        if claim == "complete":
+            raise PilotError("successor_already_taken")
+        if claim != "absent":
+            # Guard taken, successor absent or incomplete: refuse closed.
+            # Recovery is a new reviewed grant, never cleanup of this guard.
+            raise PilotError("successor_guard_incomplete")
+        try:
+            prior = _successor_prior(stage_dir, grant)
+        except PilotError:
+            # A concurrent invocation may have won the guard while this one
+            # was validating. Report the race, not a stale prior verdict.
+            raced = _successor_claim(stage_dir, grant)
+            if raced != "absent":
+                raise PilotError("successor_already_taken"
+                                 if raced == "complete"
+                                 else "successor_guard_incomplete")
+            raise
+        # Exclusive create is the atomic transition: exactly one invocation,
+        # across processes, can take this grant's guard. The original latch
+        # and every prior attempt file stay untouched.
+        guard = _successor_guard_path(stage_dir, grant)
+        try:
+            with open(guard, "x", encoding="utf-8") as f:
+                f.write(f"taken {grant['grant_id']}\n")
+        except FileExistsError:
+            raise PilotError(
+                "successor_already_taken"
+                if _successor_claim(stage_dir, grant) == "complete"
+                else "successor_guard_incomplete")
+        except OSError:
+            raise PilotError("successor_guard_write_failed")
+        lineage = {
+            "successor_of": prior["attempt_id"],
+            "successor_grant_id": grant["grant_id"],
+        }
+    else:
+        try:
+            with open(latch, "x", encoding="utf-8") as f:
+                f.write("consumed\n")
+        except FileExistsError:
+            raise PilotError("attempt_already_reserved")
+        except OSError:
+            raise PilotError("attempt_latch_write_failed")
     attempt_id = hashlib.sha256(
         f"{mft.MANIFEST_ID}|{mft.ATTEMPT_PROTOCOL_ID}|{stage}|{source_digest}|{time.time_ns()}".encode()
     ).hexdigest()[:16]
@@ -739,6 +1027,7 @@ def _reserve_attempt(control_root: Path, stage: int, cells: list[dict],
         "current_cell": None, "child_may_have_started": False,
         "attempted_cells": [], "completed_cells": [],
         "evidence_status": "not_started", "decision": None,
+        **lineage,
     }
     if os.path.lexists(adir / "reservation.json"):
         raise PilotError("attempt_reservation_preexisting")
@@ -1326,19 +1615,23 @@ def _prepare_cell(root: Path, cell: dict, out_root: Path, prior_known: float):
     return task, rundir
 
 
-def _execute_cell(root: Path, cell: dict, out_root: Path, spawn_fn, prior_known: float):
+def _execute_cell(root: Path, cell: dict, out_root: Path, spawn_fn, prior_known: float,
+                  transport: str = "meta", dry_run: bool = False):
     task, rundir = _prepare_cell(root, cell, out_root, prior_known)
-    return _execute_prepared(root, cell, out_root, spawn_fn, task, rundir)
+    return _execute_prepared(root, cell, out_root, spawn_fn, task, rundir,
+                             transport=transport, dry_run=dry_run)
 
 
 def _execute_prepared(root: Path, cell: dict, out_root: Path, spawn_fn,
-                      task: dict, rundir: Path):
+                      task: dict, rundir: Path, transport: str = "meta",
+                      dry_run: bool = False):
     """Spawn-capable phase. Any exception from here may have started a
     child and must remain may-have-started/unresolved."""
-    spec = build_cell_spec(cell, task)
+    responses = _load_dry_run_responses(root, cell) if transport == "fake" else None
+    spec = build_cell_spec(cell, task, transport=transport, responses=responses)
     ctx = {"spec": spec, "task": task, "rundir": rundir,
            "timeout_seconds": float(mft.LIMITS["worker_timeout_seconds"]),
-           "transport": "meta"}
+           "transport": transport}
     raw_run, spawn_info = spawn_fn(ctx)
     raw_path = rundir / "run.json"
     worker_output = raw_path.is_file()
@@ -1382,7 +1675,18 @@ def _execute_prepared(root: Path, cell: dict, out_root: Path, spawn_fn,
     from harness.model_smoke import paid_cost_summary
     cost = paid_cost_summary(measured)
     unknown = cost.get("unknown_cost_calls")
-    known = cost.get("known_subtotal_usd_estimated")
+    if dry_run:
+        # Fake transport has no provider billing. Report no known cost and
+        # zero model calls, but keep the same fail-closed unknown handling.
+        known = 0.0
+        if cost.get("status") == "not_applicable_synthetic":
+            cost = dict(cost)
+            cost["known_subtotal_usd_estimated"] = 0.0
+            cost["unknown_cost_calls"] = 0
+            cost["model_calls_made"] = 0
+            unknown = 0
+    else:
+        known = cost.get("known_subtotal_usd_estimated")
     halt = None
     if halt_override:
         halt = halt_override
@@ -1394,8 +1698,10 @@ def _execute_prepared(root: Path, cell: dict, out_root: Path, spawn_fn,
         halt = f"cleanup_{spawn_info.get('cleanup_status')}"
     elif not acct_ok:
         halt = f"accounting_{acct_reasons[0]}" if acct_reasons else "accounting_invalid"
+    elif dry_run and cost.get("status") != "not_applicable_synthetic":
+        halt = "dry_run_cost_not_synthetic"
     elif unknown is None or unknown > 0:
-        halt = "unknown_cost"
+        halt = "dry_run_unknown_cost" if dry_run else "unknown_cost"
     elif not _finite_cost(known):
         halt = "cost_invalid"
     elif any(s.get("status") != "ok" or s.get("sentinel_hits") for s in scans.values()):
@@ -1412,7 +1718,9 @@ def _execute_prepared(root: Path, cell: dict, out_root: Path, spawn_fn,
         "unresolved_cost_state": (
             "unresolved" if (not acct_ok or not worker_output or unknown is None
                              or (isinstance(unknown, int) and unknown > 0)
-                             or not _finite_cost(known)) else "none"),
+                             or not _finite_cost(known)
+                             or (dry_run and cost.get("status")
+                                 != "not_applicable_synthetic")) else "none"),
         "diagnostic_cost_usd": known if _finite_cost(known) else None,
     }
 
@@ -1819,16 +2127,138 @@ def run_stage(root: Path, stage: int, live: bool = False):
                                control_root=_control_root(),
                                source_digest=compute_source_digest(root))
 
+# ---------- fail-closed no-model dry-run ----------
+
+DRY_RUN_LABEL = "offline plumbing check (one cell, not a measurement)"
+DRY_RUN_STAGE = 1
+DRY_RUN_CELL_INDEX = 0
+
+def _offline_transport_available() -> bool:
+    """Refuse rather than fall back if the offline path is not importable."""
+    try:
+        from agents.model_client import FakeModelClient  # noqa: F401
+        from harness.model_compare import (execute_model_run,  # noqa: F401
+                                           measure_worker_run)
+    except Exception:
+        return False
+    return callable(execute_model_run) and callable(measure_worker_run)
+
+def _spawn_dry_worker(ctx: dict):
+    """Real worker spawn machinery, offline worker mode only."""
+    from harness.model_smoke import _pilot_env_block, _run_owned_worker
+    cmd = [sys.executable, "-m", "harness.model_pilot", "--run-one-dry"]
+    return _run_owned_worker(ctx, cmd, env_block=_pilot_env_block())
+
+def run_dry(root: Path, stage: int = DRY_RUN_STAGE, spawn_fn=None):
+    """Run ONE cell through the real worker path with the fake transport.
+
+    This mode never reserves an attempt, never writes a latch, never touches
+    the control root, and never constructs a Meta client. Its output lives
+    in its own `var/dry-run-stage1-*` area and is not receipt- or
+    reservation-shaped.
+    """
+    if stage != DRY_RUN_STAGE:
+        raise PilotError("dry_run_stage_invalid")
+    if not _offline_transport_available():
+        raise PilotError("dry_run_offline_transport_unavailable")
+    # Local root/task/var validation only: production git/venv pinning and the
+    # control-root reservation path are deliberately not part of this mode.
+    preflight_stage(Path(root), stage, production=False)
+    cell = list(mft.STAGES[stage])[DRY_RUN_CELL_INDEX]
+    out_root = (Path(root) / "var"
+                / f"dry-run-stage{stage}-{time.strftime('%Y%m%d-%H%M%S')}")
+    if _inspect_leaf(out_root) != "missing":
+        raise PilotError("dry_run_out_preexisting")
+    _validate_above_anchor(out_root)
+    _validate_mutation_chain(out_root.parent, out_root)
+    out_root.mkdir(parents=True, exist_ok=False)
+    _owned: dict = {}
+    task, rundir = _prepare_cell(Path(root), cell, out_root, 0.0)
+    row = _execute_prepared(Path(root), cell, out_root,
+                            spawn_fn or _spawn_dry_worker, task, rundir,
+                            transport="fake", dry_run=True)
+    record = {
+        "schema": "dry-run-v1",
+        "mode": "dry_run",
+        "label": DRY_RUN_LABEL,
+        "one_cell_plumbing_check": True,
+        "measurement_claim": False,
+        "receipt": False,
+        "attempt_reservation": False,
+        "stage": stage,
+        "cell_id": cell["cell_id"],
+        "task_id": cell["task_id"],
+        "arm": cell["arm"],
+        "profile": cell["profile"],
+        "transport": "fake (offline)",
+        "model_calls_made": 0,
+        "known_cost_usd": 0.0,
+        "unknown_cost_calls": 0,
+        "halt": row.get("halt"),
+        "execution_status": row.get("execution_status"),
+        "cleanup_status": row.get("cleanup_status"),
+    }
+    payload = json.dumps(record, indent=2)
+    scan = _scan_bytes(payload.encode("utf-8"))
+    if scan.get("status") != "ok" or scan.get("sentinel_hits"):
+        raise PilotError("dry_run_scan_failure")
+    _write_fresh_leaf(out_root / "dry-run.json", payload, anchor=out_root,
+                      owner=_owned, encoding="utf-8")
+    summary = (
+        f"# Dry-run stage {stage}: {DRY_RUN_LABEL}\n\n"
+        "- ONE cell, a plumbing check only: not a measurement, not task "
+        "success, and not a valid Stage 1 receipt or attempt reservation.\n"
+        "- Transport: fake (offline). No Meta client was constructed and no "
+        "environment file or model-key variable was read.\n"
+        "- Model/API calls: 0. Known cost: 0.0 USD.\n"
+        "- No attempt latch, reservation, receipt, or control-root state was "
+        "written.\n"
+        f"- cell: {cell['cell_id']} ({cell['task_id']}, {cell['arm']}, "
+        f"{cell['profile']})\n"
+        f"- execution_status: {row.get('execution_status')}\n"
+        f"- cleanup_status: {row.get('cleanup_status')}\n"
+        f"- halt: {row.get('halt')}\n"
+    )
+    scan = _scan_bytes(summary.encode("utf-8"))
+    if scan.get("status") != "ok" or scan.get("sentinel_hits"):
+        raise PilotError("dry_run_scan_failure")
+    _write_fresh_leaf(out_root / "summary.md", summary, anchor=out_root,
+                      owner=_owned, encoding="utf-8")
+    return out_root, record
+
 def main(argv=None):
     if argv is None:
         argv = sys.argv[1:]
+    if "--run-one-dry" in argv:
+        if "--run-one" in argv:
+            print(json.dumps({"error": "run_mode_conflict"}))
+            return 2
+        return pilot_run_one_cli(
+            [a for a in argv if a != "--run-one-dry"],
+            _root=_LEXICAL_ROOT, transport="fake")
     if "--run-one" in argv:
         return pilot_run_one_cli([a for a in argv if a != "--run-one"], _root=_LEXICAL_ROOT)
     p = argparse.ArgumentParser(allow_abbrev=False)
     p.add_argument("--stage", type=int, choices=[1, 2])
     p.add_argument("--live", action="store_true")
     p.add_argument("--preflight-only", action="store_true")
+    p.add_argument("--dry-run", action="store_true")
     args = p.parse_args(argv)
+    if args.dry_run:
+        if args.live or args.preflight_only:
+            print(json.dumps({"dry_run": "refused",
+                              "reason": "dry_run_live_conflict"
+                              if args.live else "dry_run_preflight_conflict"}))
+            return 2
+        stage = args.stage if args.stage is not None else DRY_RUN_STAGE
+        try:
+            out_root, record = run_dry(_LEXICAL_ROOT, stage=stage)
+        except PilotError as exc:
+            print(json.dumps({"dry_run": "refused", "reason": str(exc)}))
+            return 2
+        print(json.dumps({"dry_run": "complete", "path": str(out_root),
+                          "label": record["label"]}))
+        return 0
     if args.stage is None:
         print("stage required", file=sys.stderr)
         return 2

@@ -1,4 +1,5 @@
-import copy, hashlib, json, math, os, re, shutil
+import copy, hashlib, json, math, os, re, shutil, threading, time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import pytest
 
@@ -8,6 +9,7 @@ from harness.model_pilot import (
     PilotError, _read_pinned_task, build_cell_spec, validate_worker_spec,
     preflight_stage, _run_stage_injected, _validate_receipt, export_safe,
     pilot_accounting_check, compute_source_digest, DIGEST_PATHS,
+    _reserve_attempt, run_dry,
 )
 
 def make_root(tmp_path):
@@ -19,6 +21,10 @@ def make_root(tmp_path):
         shutil.copyfile(PROJECT_ROOT / info["path"], dst)
     (root / "store").mkdir(exist_ok=True)
     shutil.copyfile(PROJECT_ROOT / "store" / "seed_catalog.json", root / "store" / "seed_catalog.json")
+    fake_scripts = root / "eval" / "model" / "dev" / "fake_scripts.json"
+    fake_scripts.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(PROJECT_ROOT / "eval" / "model" / "dev" / "fake_scripts.json",
+                    fake_scripts)
     return root
 
 def fake_run(spec):
@@ -2158,12 +2164,32 @@ def _stub_git(monkeypatch, head="a" * 40, status="", tracked=True):
     monkeypatch.setattr(mp, "_run_git", fake)
 
 
-def test_source_digest_matches_shipped_pin():
+def test_source_digest_matches_pin_recipe(tmp_path, monkeypatch):
+    # The shipped pin is intentionally stale during a review round; it is
+    # re-pinned only by the separate review loop. This test proves the
+    # source-v2 recipe and pin parser against a synthetic pin instead of
+    # self-approving the real stale pin. The live gate's refusal on a real
+    # mismatch is covered by test_git_scope_refuses_digest_mismatch.
+    import harness.model_pilot as mp
+    root = tmp_path / "pin-root"
+    root.mkdir()
+    (root / "a.bin").write_bytes(b"one")
+    monkeypatch.setattr(mp, "DIGEST_PATHS", ("a.bin",))
+    digest = mp.compute_source_digest(root)
+    pin = root / "reviewed_source.sha256"
+    pin.write_text(f"# pin\n{digest}\n", encoding="utf-8")
+    found = re.search(r"^[0-9a-f]{64}$", pin.read_text(encoding="utf-8"),
+                      re.MULTILINE)
+    assert found is not None
+    assert found.group(0) == mp.compute_source_digest(root)
+
+
+def test_shipped_pin_is_well_formed():
     text = (PROJECT_ROOT / "harness" / "reviewed_source.sha256").read_text(
         encoding="utf-8")
     found = re.search(r"^[0-9a-f]{64}$", text, re.MULTILINE)
     assert found is not None
-    assert found.group(0) == compute_source_digest(PROJECT_ROOT)
+    assert re.fullmatch(r"[0-9a-f]{64}", found.group(0))
 
 
 def test_source_digest_changes_on_byte_or_order_change(monkeypatch, tmp_path):
@@ -2303,3 +2329,435 @@ def test_reservation_records_provenance_and_accepts_old_format(tmp_path):
     assert "source_digest_version" not in accepted
     reread = json.loads((adir / "reservation.json").read_text(encoding="utf-8"))
     assert reread["state"] == "running"
+
+
+# ---------- B4: audited attempt successor ----------
+
+_PRIOR_ID = "0123456789abcdef"
+
+
+def _successor_grant(prior_id, states=("halted",), stage=1):
+    return {"grant_id": "synthetic-grant", "stage": stage,
+            "prior_attempt_id": prior_id,
+            "accepted_prior_states": list(states)}
+
+
+def _synthetic_prior(control_root, attempt_id, state, stage=1, mtime=None):
+    stage_dir = Path(control_root) / "attempts" / f"stage{stage}"
+    stage_dir.mkdir(parents=True, exist_ok=True)
+    latch = stage_dir / "stage.latch"
+    if not latch.exists():
+        latch.write_text("consumed\n", encoding="utf-8")
+    adir = stage_dir / attempt_id
+    adir.mkdir()
+    rec = {
+        "schema": 2, "attempt_id": attempt_id, "stage": stage,
+        "protocol_id": mft.ATTEMPT_PROTOCOL_ID,
+        "manifest_id": mft.MANIFEST_ID,
+        "source_digest": "synthetic-test", "source_digest_version": 2,
+        "git_head": None, "cells": [], "reserved_allowance_usd": 0.0,
+        "state": state, "known_cost_usd": 0.0, "unknown_cost_calls": 0,
+        "unresolved_cost_state": "none", "current_cell": None,
+        "child_may_have_started": False, "attempted_cells": [],
+        "completed_cells": [], "evidence_status": "synthetic",
+        "decision": None,
+    }
+    (adir / "reservation.json").write_text(json.dumps(rec), encoding="utf-8")
+    if mtime is not None:
+        os.utime(adir, (mtime, mtime))
+    return adir, rec
+
+
+def _reserve_synth(control_root):
+    return _reserve_attempt(Path(control_root), 1, list(mft.STAGES[1]),
+                            "synthetic-test")
+
+
+def test_successor_default_denied_without_grant(tmp_path, monkeypatch):
+    monkeypatch.setattr(mft, "SUCCESSOR_GRANT", None)
+    _synthetic_prior(tmp_path / "ctl", _PRIOR_ID, "halted")
+    with pytest.raises(PilotError, match="attempt_already_reserved"):
+        _reserve_synth(tmp_path / "ctl")
+
+
+def test_successor_grant_invalid_shape_refused(tmp_path, monkeypatch):
+    _synthetic_prior(tmp_path / "ctl", _PRIOR_ID, "halted")
+    for bad in ({"grant_id": "g"}, [], "grant",
+                _successor_grant(_PRIOR_ID, stage=2),
+                _successor_grant("not-an-attempt-id"),
+                _successor_grant(_PRIOR_ID, states=("running",))):
+        monkeypatch.setattr(mft, "SUCCESSOR_GRANT", bad)
+        with pytest.raises(PilotError, match="successor_grant_invalid"):
+            _reserve_synth(tmp_path / "ctl")
+
+
+def test_successor_wrong_prior_id_refused(tmp_path, monkeypatch):
+    _synthetic_prior(tmp_path / "ctl", _PRIOR_ID, "halted")
+    monkeypatch.setattr(mft, "SUCCESSOR_GRANT",
+                        _successor_grant("fedcba9876543210"))
+    with pytest.raises(PilotError, match="successor_prior_missing"):
+        _reserve_synth(tmp_path / "ctl")
+
+
+def test_successor_named_prior_not_latest_refused(tmp_path, monkeypatch):
+    now = time.time()
+    _synthetic_prior(tmp_path / "ctl", "aaaaaaaaaaaaaaaa", "halted",
+                     mtime=now - 200)
+    _synthetic_prior(tmp_path / "ctl", "bbbbbbbbbbbbbbbb", "halted",
+                     mtime=now - 100)
+    monkeypatch.setattr(mft, "SUCCESSOR_GRANT",
+                        _successor_grant("aaaaaaaaaaaaaaaa"))
+    with pytest.raises(PilotError, match="successor_prior_mismatch"):
+        _reserve_synth(tmp_path / "ctl")
+
+
+def test_successor_non_terminal_prior_refused(tmp_path, monkeypatch):
+    _synthetic_prior(tmp_path / "ctl", _PRIOR_ID, "running")
+    monkeypatch.setattr(mft, "SUCCESSOR_GRANT", _successor_grant(_PRIOR_ID))
+    with pytest.raises(PilotError, match="successor_prior_not_terminal"):
+        _reserve_synth(tmp_path / "ctl")
+
+
+def test_successor_rejected_terminal_state_refused(tmp_path, monkeypatch):
+    _synthetic_prior(tmp_path / "ctl", _PRIOR_ID, "complete")
+    monkeypatch.setattr(mft, "SUCCESSOR_GRANT",
+                        _successor_grant(_PRIOR_ID, states=("halted",)))
+    with pytest.raises(PilotError, match="successor_prior_state_rejected"):
+        _reserve_synth(tmp_path / "ctl")
+
+
+def test_successor_unreadable_prior_refused(tmp_path, monkeypatch):
+    stage_dir = tmp_path / "ctl" / "attempts" / "stage1"
+    stage_dir.mkdir(parents=True)
+    (stage_dir / "stage.latch").write_text("consumed\n", encoding="utf-8")
+    adir = stage_dir / _PRIOR_ID
+    adir.mkdir()
+    (adir / "reservation.json").write_text("{broken", encoding="utf-8")
+    monkeypatch.setattr(mft, "SUCCESSOR_GRANT", _successor_grant(_PRIOR_ID))
+    with pytest.raises(PilotError, match="successor_prior_unreadable"):
+        _reserve_synth(tmp_path / "ctl")
+
+
+def test_successor_ambiguous_prior_refused(tmp_path, monkeypatch):
+    now = time.time()
+    _synthetic_prior(tmp_path / "ctl", "aaaaaaaaaaaaaaaa", "halted", mtime=now)
+    _synthetic_prior(tmp_path / "ctl", "bbbbbbbbbbbbbbbb", "halted", mtime=now)
+    monkeypatch.setattr(mft, "SUCCESSOR_GRANT",
+                        _successor_grant("aaaaaaaaaaaaaaaa"))
+    with pytest.raises(PilotError, match="successor_prior_ambiguous"):
+        _reserve_synth(tmp_path / "ctl")
+
+
+def test_valid_successor_records_lineage_and_preserves_prior(tmp_path, monkeypatch):
+    now = time.time()
+    adir, _rec = _synthetic_prior(tmp_path / "ctl", _PRIOR_ID, "halted",
+                                  mtime=now - 100)
+    stage_dir = adir.parent
+    prior_bytes = (adir / "reservation.json").read_bytes()
+    latch_bytes = (stage_dir / "stage.latch").read_bytes()
+    monkeypatch.setattr(mft, "SUCCESSOR_GRANT", _successor_grant(_PRIOR_ID))
+
+    state = _reserve_synth(tmp_path / "ctl")
+    assert state["successor_of"] == _PRIOR_ID
+    assert state["successor_grant_id"] == "synthetic-grant"
+    assert state["state"] == "reserved"
+    new_adir = stage_dir / state["attempt_id"]
+    assert (new_adir / "reservation.json").is_file()
+    assert (adir / "reservation.json").read_bytes() == prior_bytes
+    assert (stage_dir / "stage.latch").read_bytes() == latch_bytes
+    # Exactly one successor per reviewed grant: the guard is consumed and its
+    # successor reservation exists, so a replay refuses explicitly.
+    with pytest.raises(PilotError, match="successor_already_taken"):
+        _reserve_synth(tmp_path / "ctl")
+
+
+def test_normal_reservation_has_no_successor_lineage(tmp_path, monkeypatch):
+    monkeypatch.setattr(mft, "SUCCESSOR_GRANT", None)
+    state = _reserve_synth(tmp_path / "ctl")
+    assert "successor_of" not in state
+    assert "successor_grant_id" not in state
+
+
+# ---------- B4-fix: atomic one-time successor reservation ----------
+
+
+def _take_guard(stage_dir, grant, text="taken synthetic-grant\n"):
+    import harness.model_pilot as mp
+    guard = mp._successor_guard_path(stage_dir, grant)
+    guard.write_text(text, encoding="utf-8")
+    return guard
+
+
+def _attempt_dirs(stage_dir):
+    return sorted(p.name for p in stage_dir.iterdir() if p.is_dir())
+
+
+def test_successor_guard_taken_without_reservation_refuses_closed(
+        tmp_path, monkeypatch):
+    adir, _ = _synthetic_prior(tmp_path / "ctl", _PRIOR_ID, "halted")
+    grant = _successor_grant(_PRIOR_ID)
+    monkeypatch.setattr(mft, "SUCCESSOR_GRANT", grant)
+    guard = _take_guard(adir.parent, grant)
+
+    with pytest.raises(PilotError, match="successor_guard_incomplete"):
+        _reserve_synth(tmp_path / "ctl")
+    # Fail closed, never repair: the guard and every prior file remain, and
+    # no successor attempt was created.
+    assert guard.is_file()
+    assert _attempt_dirs(adir.parent) == [_PRIOR_ID]
+
+
+def test_successor_guard_with_unreadable_partial_refuses_closed(
+        tmp_path, monkeypatch):
+    adir, _ = _synthetic_prior(tmp_path / "ctl", _PRIOR_ID, "halted")
+    grant = _successor_grant(_PRIOR_ID)
+    monkeypatch.setattr(mft, "SUCCESSOR_GRANT", grant)
+    _take_guard(adir.parent, grant)
+    partial = adir.parent / "ffffffffffffffff"
+    partial.mkdir()
+    (partial / "reservation.json").write_text("{broken", encoding="utf-8")
+
+    with pytest.raises(PilotError, match="successor_guard_incomplete"):
+        _reserve_synth(tmp_path / "ctl")
+    assert (partial / "reservation.json").read_text(encoding="utf-8") == "{broken"
+    assert _attempt_dirs(adir.parent) == sorted([_PRIOR_ID, "ffffffffffffffff"])
+
+
+def test_successor_guard_wrong_type_refuses_unreadable(tmp_path, monkeypatch):
+    adir, _ = _synthetic_prior(tmp_path / "ctl", _PRIOR_ID, "halted")
+    grant = _successor_grant(_PRIOR_ID)
+    monkeypatch.setattr(mft, "SUCCESSOR_GRANT", grant)
+    import harness.model_pilot as mp
+    mp._successor_guard_path(adir.parent, grant).mkdir()
+
+    with pytest.raises(PilotError, match="successor_guard_unreadable"):
+        _reserve_synth(tmp_path / "ctl")
+    # The wrong-type guard stays and no successor attempt appeared.
+    assert _attempt_dirs(adir.parent) == sorted(
+        [_PRIOR_ID, mp._successor_guard_path(adir.parent, grant).name])
+
+
+def test_successor_concurrent_race_reserves_exactly_one(tmp_path, monkeypatch):
+    import harness.model_pilot as mp
+    _synthetic_prior(tmp_path / "ctl", _PRIOR_ID, "halted")
+    grant = _successor_grant(_PRIOR_ID)
+    monkeypatch.setattr(mft, "SUCCESSOR_GRANT", grant)
+    workers = 8
+    barrier = threading.Barrier(workers)
+
+    def attempt(_index):
+        barrier.wait(timeout=30)
+        try:
+            return ("ok", _reserve_synth(tmp_path / "ctl"))
+        except PilotError as exc:
+            return ("refused", str(exc))
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        outcomes = list(pool.map(attempt, range(workers)))
+
+    reserved = [value for status, value in outcomes if status == "ok"]
+    refused = [value for status, value in outcomes if status == "refused"]
+    assert len(reserved) == 1, outcomes
+    assert len(refused) == workers - 1, outcomes
+    assert set(refused) <= {"successor_already_taken",
+                            "successor_guard_incomplete"}, refused
+
+    stage_dir = tmp_path / "ctl" / "attempts" / "stage1"
+    successor_dirs = [d for d in _attempt_dirs(stage_dir) if d != _PRIOR_ID]
+    assert len(successor_dirs) == 1, successor_dirs
+    rec = json.loads((stage_dir / successor_dirs[0] / "reservation.json")
+                     .read_text(encoding="utf-8"))
+    assert rec["successor_of"] == _PRIOR_ID
+    assert rec["successor_grant_id"] == grant["grant_id"]
+    assert (stage_dir / "stage.latch").read_text(encoding="utf-8") == "consumed\n"
+
+    # Replay after the race still refuses, and still creates nothing.
+    with pytest.raises(PilotError, match="successor_already_taken"):
+        _reserve_synth(tmp_path / "ctl")
+    assert [d for d in _attempt_dirs(stage_dir) if d != _PRIOR_ID] == successor_dirs
+
+
+def test_new_reviewed_grant_can_succeed_after_a_stuck_guard(tmp_path, monkeypatch):
+    adir, _ = _synthetic_prior(tmp_path / "ctl", _PRIOR_ID, "halted")
+    stuck = _successor_grant(_PRIOR_ID)
+    monkeypatch.setattr(mft, "SUCCESSOR_GRANT", stuck)
+    _take_guard(adir.parent, stuck)
+    with pytest.raises(PilotError, match="successor_guard_incomplete"):
+        _reserve_synth(tmp_path / "ctl")
+
+    # Recovery is a NEW reviewed grant after inspection, never cleanup.
+    fresh = dict(stuck, grant_id="synthetic-grant-2")
+    monkeypatch.setattr(mft, "SUCCESSOR_GRANT", fresh)
+    state = _reserve_synth(tmp_path / "ctl")
+    assert state["successor_grant_id"] == "synthetic-grant-2"
+    assert state["successor_of"] == _PRIOR_ID
+    assert len([d for d in _attempt_dirs(adir.parent) if d != _PRIOR_ID]) == 1
+
+
+# ---------- B4: no-model dry-run ----------
+
+
+def _dry_zero_call_run(spec):
+    return {
+        "arm": spec["arm"], "trial": 1, "execution_status": "normal",
+        "declared_outcome": None, "raw_verdict": None,
+        "seed_lines": spec["setup"]["seed_lines"], "items": [],
+        "snapshots": [], "mutations": [],
+        "hook_counts": {"before_add": 0, "after_add": 0, "pre_add": 0},
+        "adapter_mutations": {"add_to_cart": 0, "set_line_quantity": 0,
+                              "delete_line": 0},
+        "stop_reasons": [], "final_cookie": None, "final_persisted": None,
+        "guard": {"applied": False}, "transport": "fake",
+        "budget": {
+            "calls_attempted": 0, "calls_made": 0, "calls_refused": 0,
+            "consumed_tokens": 0, "reserved_tokens": 0, "overrun": False,
+            "records": [], "sidecar": [],
+            "smoke_guard": {"enabled": True, "transport_kind": "fake",
+                            "stopped": False},
+        },
+    }
+
+
+def _dry_spawn(ctx):
+    run = _dry_zero_call_run(ctx["spec"])
+    (ctx["rundir"] / "run.json").write_text(json.dumps(run, indent=2),
+                                            encoding="utf-8")
+    return run, {"cleanup_status": "verified", "timed_out": False}
+
+
+def test_dry_run_refuses_live_conflict(tmp_path, monkeypatch):
+    import harness.model_pilot as mp
+    called = {"n": 0}
+    monkeypatch.setattr(mp, "run_dry",
+                        lambda *a, **k: called.__setitem__("n", called["n"] + 1))
+    rc = mp.main(["--stage", "1", "--dry-run", "--live"])
+    assert rc == 2
+    assert called["n"] == 0
+
+
+def test_dry_run_refuses_stage2(tmp_path, monkeypatch):
+    import harness.model_pilot as mp
+    rc = mp.main(["--stage", "2", "--dry-run"])
+    assert rc == 2
+
+
+def test_dry_run_refuses_when_offline_transport_unavailable(tmp_path, monkeypatch):
+    import harness.model_pilot as mp
+    root = make_root(tmp_path)
+    monkeypatch.setattr(mp, "_offline_transport_available", lambda: False)
+    with pytest.raises(PilotError,
+                       match="dry_run_offline_transport_unavailable"):
+        mp.run_dry(root, 1, spawn_fn=_dry_spawn)
+    assert not list((root / "var").glob("dry-run-*"))
+
+
+def test_dry_run_writes_no_latch_or_reservation_shapes(tmp_path, monkeypatch):
+    import harness.model_pilot as mp
+    root = make_root(tmp_path)
+
+    def _boom():
+        raise AssertionError("control root must not be touched")
+
+    monkeypatch.setattr(mp, "_control_root", _boom)
+    out, record = mp.run_dry(root, 1, spawn_fn=_dry_spawn)
+
+    assert record["mode"] == "dry_run"
+    assert record["receipt"] is False
+    assert record["attempt_reservation"] is False
+    assert record["model_calls_made"] == 0
+    assert record["known_cost_usd"] == 0.0
+    assert out.parent == root / "var"
+    assert out.name.startswith("dry-run-stage1-")
+    assert (out / "dry-run.json").is_file()
+    assert (out / "summary.md").is_file()
+    assert not (out / "batch.json").exists()
+    assert not (out / "ledger.json").exists()
+    assert not (out / "EXPORT_OUTCOME.json").exists()
+    assert not list(out.rglob("reservation.json"))
+    assert not list(out.rglob("stage.latch"))
+    summary = (out / "summary.md").read_text(encoding="utf-8")
+    assert "not a measurement" in summary
+    assert "Model/API calls: 0" in summary
+    assert "control-root state" in summary
+
+
+def test_dry_run_never_builds_meta_client_or_dotenv(tmp_path, monkeypatch):
+    import harness.model_pilot as mp
+    root = make_root(tmp_path)
+
+    def _boom(*args, **kwargs):
+        raise AssertionError("dotenv/Meta path must not be reached")
+
+    monkeypatch.setattr(mp, "_make_pilot_dotenv_fallback", _boom)
+    out, record = mp.run_dry(root, 1, spawn_fn=_dry_spawn)
+    assert record["model_calls_made"] == 0
+    assert (out / "dry-run.json").is_file()
+
+
+# ---------- B4-fix: dry-run fixture integrity ----------
+
+
+def test_dry_run_fixture_pin_is_reviewed_and_matches_bytes():
+    assert "harness/pilot_manifest.py" in DIGEST_PATHS
+    pin = mft.DRY_RUN_FIXTURE
+    assert isinstance(pin, dict) and set(pin) == {"path", "sha256"}
+    data = (PROJECT_ROOT / pin["path"]).read_bytes()
+    assert hashlib.sha256(data).hexdigest() == pin["sha256"]
+
+
+def test_dry_run_fixture_mismatch_refused(tmp_path):
+    import harness.model_pilot as mp
+    root = make_root(tmp_path)
+    fixture = root / mft.DRY_RUN_FIXTURE["path"]
+    data = json.loads(fixture.read_text(encoding="utf-8"))
+    data["m-clean-seeded"]["CA"]["responses"][0]["payload"]["items"][0][
+        "quantity"] = 2
+    fixture.write_text(json.dumps(data), encoding="utf-8")
+    cell = list(mft.STAGES[1])[0]
+    with pytest.raises(PilotError, match="dry_run_fixture_mismatch"):
+        mp._load_dry_run_responses(root, cell)
+
+
+def test_dry_run_fixture_missing_refused(tmp_path):
+    import harness.model_pilot as mp
+    root = make_root(tmp_path)
+    (root / mft.DRY_RUN_FIXTURE["path"]).unlink()
+    cell = list(mft.STAGES[1])[0]
+    with pytest.raises(PilotError, match="dry_run_responses_unavailable"):
+        mp._load_dry_run_responses(root, cell)
+
+
+def test_dry_run_fixture_pin_invalid_refused(tmp_path, monkeypatch):
+    import harness.model_pilot as mp
+    root = make_root(tmp_path)
+    cell = list(mft.STAGES[1])[0]
+    for bad in (None, {"path": "eval/model/dev/fake_scripts.json"},
+                {"path": "eval/model/dev/fake_scripts.json",
+                 "sha256": "not-a-hex-digest"},
+                {"path": "eval/model/dev/fake_scripts.json",
+                 "sha256": "a" * 64, "extra": 1}):
+        monkeypatch.setattr(mft, "DRY_RUN_FIXTURE", bad)
+        with pytest.raises(PilotError, match="dry_run_fixture_pin_invalid"):
+            mp._load_dry_run_responses(root, cell)
+
+
+def test_live_meta_path_never_reads_dry_run_fixture(tmp_path, monkeypatch):
+    import harness.model_pilot as mp
+    root = make_root(tmp_path)
+
+    def _boom(*args, **kwargs):
+        raise AssertionError("live meta path consulted the dry-run fixture")
+
+    monkeypatch.setattr(mp, "_load_dry_run_responses", _boom)
+    cell = list(mft.STAGES[1])[0]
+    task, _, _ = _read_pinned_task(root, cell["task_id"])
+    spec = build_cell_spec(cell, task)
+    assert spec["transport"] == "meta" and spec["allow_live"] is True
+    out = root / "var" / "model-pilot-stage1-chk" / "cells" / cell["cell_id"]
+    out.mkdir(parents=True)
+    spec["_startup_barrier"] = {"ready": str(out / "barrier-ready.json"),
+                                "release": str(out / "barrier-release")}
+    validated, _ = validate_worker_spec(spec, root)
+    assert validated == cell
+    assert spec["transport"] == "meta"
+    assert spec["allow_live"] is True

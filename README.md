@@ -137,6 +137,75 @@ https://dev.meta.ai/docs/pricing-rate-limits on 2026-10-31.
   `batch.json`, `ledger.json` and `summary.md` before publication, and
   export withholds anything that fails its checks.
 
+### Attempt successor (default denied)
+
+`SUCCESSOR_GRANT` in `harness/pilot_manifest.py` is reviewed data inside
+the digest-covered source. It is **UNSET** by default, so a consumed
+attempt still refuses with `attempt_already_reserved`. No grant is wired
+for the halted attempt `627eb19e50084072`.
+
+When a later review sets it, the grant names exactly one prior attempt id
+and the prior terminal states it accepts. At runtime the harness validates
+that grant against the prior attempt's on-disk `reservation.json`, refusing
+with explicit categories (`successor_grant_invalid`,
+`successor_prior_missing`, `successor_prior_mismatch`,
+`successor_prior_unreadable`, `successor_prior_ambiguous`,
+`successor_prior_not_terminal`, `successor_prior_state_rejected`). Prior
+attempt files are read only. A successful successor reservation records
+`successor_of` and `successor_grant_id`.
+
+Reserving a successor is atomic across processes: the transition is guarded
+by an exclusive per-grant create (`successor-claim-<hash>.guard`), in the
+same style as the original latch, not a check-then-write. However many
+invocations run concurrently under one reviewed grant, exactly one takes the
+guard and reserves the successor; every other invocation refuses with
+`successor_already_taken` (the successor exists) or
+`successor_guard_incomplete` (the guard was taken but no complete successor
+is on disk). Failures after the guard are fail-closed: a crash or partial
+write leaves the guard in place, so every later run under that grant refuses
+with `successor_guard_incomplete` and nothing is repaired, reset, or
+deleted. Recovery is a **new** reviewed grant after inspection, which gets
+its own guard; the stuck guard keeps blocking the old one. A replay under a
+consumed grant refuses the same way, and the original latch plus all prior
+attempt files stay byte-untouched. The mechanism does not unlock Stage 2,
+retry inside an attempt, or change any cost gate.
+
+### No-model dry-run (separately run runtime check)
+
+The dry-run is a deliberately separate mode that runs **one** Stage 1 cell
+through the real worker spawn machinery, local store boot and Chromium
+launch, with the model transport replaced by the offline fake client. It
+never constructs the Meta client and never reads `.env` or
+`MODEL_API_KEY`; if the offline transport is unavailable it refuses rather
+than falling back. It never writes an attempt latch, reservation, receipt
+or control-root state. Output goes to its own labeled
+`var\dry-run-stage1-<timestamp>\` area (`dry-run.json` plus `summary.md`),
+reports zero model calls and no known cost, and says it is a plumbing check,
+not a measurement.
+
+Its offline responses come from `eval/model/dev/fake_scripts.json`, which is
+hash-pinned in `harness/pilot_manifest.py` (`DRY_RUN_FIXTURE`, the same style
+as the pinned task files). That manifest module is inside the reviewed
+digest closure, so the fixture is tamper-evident under the review loop: a
+replaced or corrupted fixture refuses with `dry_run_fixture_mismatch`, a
+missing/unreadable/malformed one with `dry_run_responses_unavailable`, and a
+malformed pin with `dry_run_fixture_pin_invalid`. There is no fallback. The
+live Meta path never reads the fixture and `SUCCESSOR_GRANT` never consults
+it.
+
+Exact command, run from the repository root, **separately and
+deliberately**, never as part of the unit test suite:
+
+```powershell
+.\.venv\Scripts\python.exe -m harness.model_pilot --stage 1 --dry-run
+```
+
+This command spawns a real worker, boots the local store and launches
+Chromium. It refuses when combined with `--live`, for any stage other than
+1, or when the offline transport is not importable. Neither the successor
+mechanism nor the dry-run changes the fresh-approval requirement for any
+paid attempt.
+
 ### Scoring readout
 
 Each cell's worker output is measured independently
