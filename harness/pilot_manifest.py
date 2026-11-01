@@ -95,9 +95,43 @@ STAGES = {
     ),
 }
 
-# Predecessor receipt seam - UNSET until a Stage1 batch is reviewed and accepted
-ACCEPTED_STAGE1_RECEIPT_ID: str | None = None
-ACCEPTED_STAGE1_MANIFEST_ID: str | None = None
+# Predecessor receipt seam - Stage 1 batch reviewed and accepted (2026-11-02).
+# The receipt is reviewed data in this digest-covered module; Stage 2 is admitted
+# only when it validates and its file_hashes match the exported Stage 1 bytes.
+ACCEPTED_STAGE1_RECEIPT_ID: str | None = "s1-20261102-011438-fb2b7332db67b790"
+ACCEPTED_STAGE1_MANIFEST_ID: str | None = "cartproof-dev-comparison-2026-10-31.1"
+ACCEPTED_STAGE1_RECEIPT: dict | None = {
+    "receipt_id": "s1-20261102-011438-fb2b7332db67b790",
+    "manifest_id": "cartproof-dev-comparison-2026-10-31.1",
+    "stage": 1,
+    "status": "complete",
+    "known_cost": 0.16980594999999998,
+    "unknown_cost_calls": 0,
+    "cells": [
+        "s1-seeded-ca-spark",
+        "s1-seeded-ca-wonder",
+        "s1-ambig-ca-wonder",
+        "s1-ambig-ca-spark",
+    ],
+    "file_hashes": {
+        "batch.json": "5606d1120a3dd171fa0f1e723ab169eebdba919e57741ba1e3d34402dd240d5d",
+        "ledger.json": "5f5a3c3d33384f081b48926a1fde0a10e3d6caf22bb3a6d2b7fcd92a7729fb16",
+        "summary.md": "9c5e7eb2655074512ed750be62a3d9524077e91d034cc3ad020b7a583d7b5466",
+        "cells/s1-seeded-ca-spark/run.json": "e66799699969caed8ea3493b39e70f0eb6f5bdcd06f34cb29e9561a320d2e0e2",
+        "cells/s1-seeded-ca-spark/evaluated.json": "b9c2d37f9885a18aacdd9cd4e9922ad50830384380e075636c10b5a7f52267c0",
+        "cells/s1-seeded-ca-spark/secret-scan.txt": "330814b2932713e1774e2e26be0fca14bedc0f5b518d3f2ba0257fff6f2f634e",
+        "cells/s1-seeded-ca-wonder/run.json": "bc70d7210c4311ebe3ac5da9b6de0ca6405366668de6b63df5775b9c96db59f5",
+        "cells/s1-seeded-ca-wonder/evaluated.json": "831235e2794b3e26f69edc4fe8cc3f4dcf53878095808c28bd1916e03939d017",
+        "cells/s1-seeded-ca-wonder/secret-scan.txt": "330814b2932713e1774e2e26be0fca14bedc0f5b518d3f2ba0257fff6f2f634e",
+        "cells/s1-ambig-ca-wonder/run.json": "338b8410dbc25ab6f0fd3d64e41d52dc84a75f0b88af1226153c70c608b44079",
+        "cells/s1-ambig-ca-wonder/evaluated.json": "7cf7b020047ca04ff7bd86199beaa89a7047e7cce6d80ec7af3bfc088a1ec598",
+        "cells/s1-ambig-ca-wonder/secret-scan.txt": "330814b2932713e1774e2e26be0fca14bedc0f5b518d3f2ba0257fff6f2f634e",
+        "cells/s1-ambig-ca-spark/run.json": "a3a2d93087e6054b04f078b9d8f922f625e6ac374e8b784310b7f522c8a357c6",
+        "cells/s1-ambig-ca-spark/evaluated.json": "e7882543f3919cf8113fc1026907bb706b01ba10cfab4c9426a756d1c98d7bd7",
+        "cells/s1-ambig-ca-spark/secret-scan.txt": "330814b2932713e1774e2e26be0fca14bedc0f5b518d3f2ba0257fff6f2f634e",
+        "manifest.json": "d6ef1930dc73ad7043734d9441c30b0fed788e388de09d11f9e00422454b6593",
+    },
+}
 
 # Audited attempt-successor authority. UNSET by default: a consumed attempt
 # still refuses with attempt_already_reserved. When set, this reviewed value

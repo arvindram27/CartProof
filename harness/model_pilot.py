@@ -2139,9 +2139,11 @@ def run_stage(root: Path, stage: int, live: bool = False):
     if live is not True:
         raise PilotError("live_flag_required")
     from harness.model_smoke import spawn_pilot_worker
+    receipt = mft.ACCEPTED_STAGE1_RECEIPT if stage == 2 else None
     return _run_stage_injected(root, stage, spawn_pilot_worker, production=True,
                                control_root=_control_root(),
-                               source_digest=compute_source_digest(root))
+                               source_digest=compute_source_digest(root),
+                               receipt=receipt)
 
 # ---------- fail-closed no-model dry-run ----------
 

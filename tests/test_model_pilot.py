@@ -228,12 +228,71 @@ def test_partial_halt_stops_before_next_cell(tmp_path):
     assert len(data["cells"]) == 2
     assert calls["n"] == 2
 
-def test_stage2_closed_and_receipt_shape(tmp_path):
+def test_stage2_closed_and_receipt_shape(tmp_path, monkeypatch):
     root = make_root(tmp_path)
+    monkeypatch.setattr(mft, "ACCEPTED_STAGE1_RECEIPT_ID", None)
+    monkeypatch.setattr(mft, "ACCEPTED_STAGE1_MANIFEST_ID", None)
     with pytest.raises(PilotError, match="receipt_not_accepted"):
         _run_stage_injected(root, 2, fake_spawn, production=False, control_root=tmp_path/"pilot-control3")
     with pytest.raises(PilotError):
         _validate_receipt({})
+
+
+def test_reviewed_receipt_shape_matches_constants():
+    receipt = mft.ACCEPTED_STAGE1_RECEIPT
+    assert isinstance(receipt, dict)
+    assert set(receipt) == {"receipt_id", "manifest_id", "stage", "status",
+                            "known_cost", "unknown_cost_calls", "cells",
+                            "file_hashes"}
+    assert receipt["receipt_id"] == mft.ACCEPTED_STAGE1_RECEIPT_ID
+    assert receipt["manifest_id"] == mft.ACCEPTED_STAGE1_MANIFEST_ID
+    assert receipt["stage"] == 1
+    assert receipt["status"] == "complete"
+    assert receipt["unknown_cost_calls"] == 0
+    assert receipt["cells"] == [c["cell_id"] for c in mft.STAGES[1]]
+    expected = {"batch.json", "ledger.json", "summary.md", "manifest.json"}
+    for cid in receipt["cells"]:
+        expected |= {f"cells/{cid}/run.json", f"cells/{cid}/evaluated.json",
+                     f"cells/{cid}/secret-scan.txt"}
+    assert set(receipt["file_hashes"]) == expected
+    assert len(receipt["file_hashes"]) == 16
+
+
+def test_receipt_id_mismatch_refused():
+    bad = dict(mft.ACCEPTED_STAGE1_RECEIPT)
+    bad["receipt_id"] = "not-the-reviewed-id"
+    with pytest.raises(PilotError, match="receipt_id_mismatch"):
+        _validate_receipt(bad)
+
+
+def test_stage2_accepts_reviewed_receipt(tmp_path):
+    root = make_root(tmp_path)
+    batch = _run_stage_injected(root, 2, fake_spawn, production=False,
+                                control_root=tmp_path / "pilot-control-stage2",
+                                receipt=mft.ACCEPTED_STAGE1_RECEIPT)
+    data = json.loads((batch / "batch.json").read_text(encoding="utf-8"))
+    assert data["status"] == "complete"
+    assert data["stage"] == 2
+    assert len(data["cells"]) == 8
+    assert data["known_cost_usd_estimated"] >= \
+        mft.ACCEPTED_STAGE1_RECEIPT["known_cost"]
+
+
+def test_run_stage_threads_receipt_only_for_stage2(monkeypatch):
+    import harness.model_pilot as mp
+    seen = {}
+
+    def fake_injected(root, stage, spawn_owned, **kwargs):
+        seen["stage"] = stage
+        seen["receipt"] = kwargs.get("receipt")
+        return root
+
+    monkeypatch.setattr(mp, "_run_stage_injected", fake_injected)
+    mp.run_stage(mp.PROJECT_ROOT, 1, live=True)
+    assert seen["stage"] == 1 and seen["receipt"] is None
+    mp.run_stage(mp.PROJECT_ROOT, 2, live=True)
+    assert seen["stage"] == 2
+    assert seen["receipt"] is mft.ACCEPTED_STAGE1_RECEIPT
 
 def test_export_safe_excludes_dbs_and_hashes_only_delivered(tmp_path):
     root = make_root(tmp_path)
