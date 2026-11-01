@@ -645,6 +645,7 @@ def pilot_accounting_check(run: dict, profile: dict) -> tuple[bool, list]:
     ok, reasons, made = validate_paid_accounting(run)
     reasons = list(reasons)
     budget = run.get("budget") or {}
+    transport = run.get("transport")
     records = budget.get("records") or []
     sidecars = budget.get("sidecar") or []
     if not isinstance(records, list):
@@ -701,46 +702,51 @@ def pilot_accounting_check(run: dict, profile: dict) -> tuple[bool, list]:
         reasons.append("reserved_total_mismatch")
     if _is_int(consumed) and consumed != sum_con:
         reasons.append("consumed_total_mismatch")
-    # sidecars exact made-call mapping
-    by_idx = {}
-    for s in sidecars:
-        if not isinstance(s, dict) or not _is_int(s.get("call_index")):
-            reasons.append("sidecar_invalid"); continue
-        if s["call_index"] in by_idx:
-            reasons.append("sidecar_duplicate_index")
-        by_idx[s["call_index"]] = s
-    if set(by_idx.keys()) != made_idx:
-        reasons.append("sidecar_correspondence_mismatch")
-    for idx in made_idx:
-        s = by_idx.get(idx)
-        if not s:
-            continue
-        pu = s.get("provider_usage")
-        if not isinstance(pu, dict) or set(pu.keys()) != {
-                "prompt_tokens", "completion_tokens", "total_tokens", "cached_tokens", "reasoning_tokens"}:
-            reasons.append("provider_usage_shape_invalid"); continue
-        prompt, completion = pu.get("prompt_tokens"), pu.get("completion_tokens")
-        total, cached, reasoning = pu.get("total_tokens"), pu.get("cached_tokens"), pu.get("reasoning_tokens")
-        if not all(_is_int(v) and v >= 0 for v in (prompt, completion, total, cached, reasoning)):
-            reasons.append("provider_tokens_invalid"); continue
-        if total != prompt + completion:
-            reasons.append("provider_total_mismatch")
-        if cached > prompt:
-            reasons.append("provider_cached_invalid")
-        if reasoning > completion:
-            reasons.append("provider_reasoning_invalid")
-        rec = next((x for x in records if isinstance(x, dict) and x.get("call_index") == idx), None)
-        if rec and rec.get("status") in ("made", "overrun"):
-            declared = rec.get("declared_usage")
-            if not _is_int(declared) or declared != total:
-                reasons.append("record_declared_mismatch")
-        cost = s.get("estimated_cost_usd")
-        if not _is_num(cost) or cost < 0:
-            reasons.append("cost_not_finite")
-        else:
-            recomputed = _recomputed_cost(s, profile)
-            if recomputed is None or abs(recomputed - cost) > 1e-9:
-                reasons.append("cost_recompute_mismatch")
+    if transport == "meta":
+        # sidecars exact made-call mapping (paid transport only)
+        by_idx = {}
+        for s in sidecars:
+            if not isinstance(s, dict) or not _is_int(s.get("call_index")):
+                reasons.append("sidecar_invalid"); continue
+            if s["call_index"] in by_idx:
+                reasons.append("sidecar_duplicate_index")
+            by_idx[s["call_index"]] = s
+        if set(by_idx.keys()) != made_idx:
+            reasons.append("sidecar_correspondence_mismatch")
+        for idx in made_idx:
+            s = by_idx.get(idx)
+            if not s:
+                continue
+            pu = s.get("provider_usage")
+            if not isinstance(pu, dict) or set(pu.keys()) != {
+                    "prompt_tokens", "completion_tokens", "total_tokens", "cached_tokens", "reasoning_tokens"}:
+                reasons.append("provider_usage_shape_invalid"); continue
+            prompt, completion = pu.get("prompt_tokens"), pu.get("completion_tokens")
+            total, cached, reasoning = pu.get("total_tokens"), pu.get("cached_tokens"), pu.get("reasoning_tokens")
+            if not all(_is_int(v) and v >= 0 for v in (prompt, completion, total, cached, reasoning)):
+                reasons.append("provider_tokens_invalid"); continue
+            if total != prompt + completion:
+                reasons.append("provider_total_mismatch")
+            if cached > prompt:
+                reasons.append("provider_cached_invalid")
+            if reasoning > completion:
+                reasons.append("provider_reasoning_invalid")
+            rec = next((x for x in records if isinstance(x, dict) and x.get("call_index") == idx), None)
+            if rec and rec.get("status") in ("made", "overrun"):
+                declared = rec.get("declared_usage")
+                if not _is_int(declared) or declared != total:
+                    reasons.append("record_declared_mismatch")
+            cost = s.get("estimated_cost_usd")
+            if not _is_num(cost) or cost < 0:
+                reasons.append("cost_not_finite")
+            else:
+                recomputed = _recomputed_cost(s, profile)
+                if recomputed is None or abs(recomputed - cost) > 1e-9:
+                    reasons.append("cost_recompute_mismatch")
+    elif transport != "fake":
+        # Unknown is never treated as fake; fake's synthetic-usage contract is
+        # owned by validate_paid_accounting and is not duplicated here.
+        reasons.append("transport_unknown")
     return (not reasons), reasons
 
 # ---------- durable attempt latch / control ----------
@@ -1615,6 +1621,9 @@ def _prepare_cell(root: Path, cell: dict, out_root: Path, prior_known: float):
     return task, rundir
 
 
+_SPAWN_FIELDS = ("cleanup_status", "timed_out", "job_assigned", "startup_ms",
+                 "active_before_close", "active_after_terminate")
+
 def _execute_cell(root: Path, cell: dict, out_root: Path, spawn_fn, prior_known: float,
                   transport: str = "meta", dry_run: bool = False):
     task, rundir = _prepare_cell(root, cell, out_root, prior_known)
@@ -1676,15 +1685,17 @@ def _execute_prepared(root: Path, cell: dict, out_root: Path, spawn_fn,
     cost = paid_cost_summary(measured)
     unknown = cost.get("unknown_cost_calls")
     if dry_run:
-        # Fake transport has no provider billing. Report no known cost and
-        # zero model calls, but keep the same fail-closed unknown handling.
+        # Fake transport has no provider billing. Report no known provider
+        # cost, but keep the same fail-closed unknown handling.
         known = 0.0
         if cost.get("status") == "not_applicable_synthetic":
             cost = dict(cost)
             cost["known_subtotal_usd_estimated"] = 0.0
             cost["unknown_cost_calls"] = 0
-            cost["model_calls_made"] = 0
             unknown = 0
+        raw_offline = (measured.get("budget") or {}).get("calls_made")
+        offline_calls = (raw_offline if _is_int(raw_offline) and raw_offline >= 0
+                         else None)
     else:
         known = cost.get("known_subtotal_usd_estimated")
     halt = None
@@ -1706,10 +1717,11 @@ def _execute_prepared(root: Path, cell: dict, out_root: Path, spawn_fn,
         halt = "cost_invalid"
     elif any(s.get("status") != "ok" or s.get("sentinel_hits") for s in scans.values()):
         halt = "scan_failure"
-    return {
+    row = {
         "cell_id": cell["cell_id"], "task_id": cell["task_id"], "arm": cell["arm"],
         "profile": cell["profile"], "execution_status": measured.get("execution_status"),
         "cleanup_status": spawn_info.get("cleanup_status"),
+        "spawn": {k: spawn_info[k] for k in _SPAWN_FIELDS if k in spawn_info},
         "accounting_ok": acct_ok, "accounting_reasons": acct_reasons,
         "scan": scans, "cost": cost, "known_cost": known or 0.0, "halt": halt,
         "measured_outcome": evaluated.get("measured_outcome"),
@@ -1723,6 +1735,10 @@ def _execute_prepared(root: Path, cell: dict, out_root: Path, spawn_fn,
                                  != "not_applicable_synthetic")) else "none"),
         "diagnostic_cost_usd": known if _finite_cost(known) else None,
     }
+    if dry_run:
+        row["provider_calls_made"] = 0
+        row["offline_calls_made"] = offline_calls
+    return row
 
 SCORING_READOUT_LABEL = ("one trial per cell; a plumbing/scoring readout of these "
                          "cells only, not a statistical or model-capability claim")
@@ -2191,12 +2207,14 @@ def run_dry(root: Path, stage: int = DRY_RUN_STAGE, spawn_fn=None):
         "arm": cell["arm"],
         "profile": cell["profile"],
         "transport": "fake (offline)",
-        "model_calls_made": 0,
+        "provider_calls_made": 0,
+        "offline_calls_made": row.get("offline_calls_made"),
         "known_cost_usd": 0.0,
         "unknown_cost_calls": 0,
         "halt": row.get("halt"),
         "execution_status": row.get("execution_status"),
         "cleanup_status": row.get("cleanup_status"),
+        "spawn": row.get("spawn"),
     }
     payload = json.dumps(record, indent=2)
     scan = _scan_bytes(payload.encode("utf-8"))
@@ -2204,13 +2222,18 @@ def run_dry(root: Path, stage: int = DRY_RUN_STAGE, spawn_fn=None):
         raise PilotError("dry_run_scan_failure")
     _write_fresh_leaf(out_root / "dry-run.json", payload, anchor=out_root,
                       owner=_owned, encoding="utf-8")
+    offline_value = row.get("offline_calls_made")
+    offline_label = offline_value if offline_value is not None else "unavailable"
     summary = (
         f"# Dry-run stage {stage}: {DRY_RUN_LABEL}\n\n"
         "- ONE cell, a plumbing check only: not a measurement, not task "
         "success, and not a valid Stage 1 receipt or attempt reservation.\n"
         "- Transport: fake (offline). No Meta client was constructed and no "
         "environment file or model-key variable was read.\n"
-        "- Model/API calls: 0. Known cost: 0.0 USD.\n"
+        f"- Provider calls: 0. Offline fixture calls: {offline_label}. "
+        "Known cost: 0.0 USD.\n"
+        "- Offline fixture calls are zero-cost local model responses; only "
+        "provider calls could be billed.\n"
         "- No attempt latch, reservation, receipt, or control-root state was "
         "written.\n"
         f"- cell: {cell['cell_id']} ({cell['task_id']}, {cell['arm']}, "
@@ -2256,9 +2279,24 @@ def main(argv=None):
         except PilotError as exc:
             print(json.dumps({"dry_run": "refused", "reason": str(exc)}))
             return 2
-        print(json.dumps({"dry_run": "complete", "path": str(out_root),
-                          "label": record["label"]}))
-        return 0
+        rec = record if isinstance(record, dict) else {}
+        success = (
+            isinstance(record, dict)
+            and "halt" in record
+            and record["halt"] is None
+            and rec.get("execution_status") == "normal"
+            and rec.get("cleanup_status") == "verified"
+        )
+        payload = {
+            "dry_run": "complete" if success else "halted",
+            "path": str(out_root),
+            "label": rec.get("label"),
+            "halt": rec.get("halt"),
+            "execution_status": rec.get("execution_status"),
+            "cleanup_status": rec.get("cleanup_status"),
+        }
+        print(json.dumps(payload))
+        return 0 if success else 3
     if args.stage is None:
         print("stage required", file=sys.stderr)
         return 2

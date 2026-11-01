@@ -2664,7 +2664,9 @@ def test_dry_run_writes_no_latch_or_reservation_shapes(tmp_path, monkeypatch):
     assert record["mode"] == "dry_run"
     assert record["receipt"] is False
     assert record["attempt_reservation"] is False
-    assert record["model_calls_made"] == 0
+    assert record["provider_calls_made"] == 0
+    assert record["offline_calls_made"] == 0
+    assert "model_calls_made" not in record
     assert record["known_cost_usd"] == 0.0
     assert out.parent == root / "var"
     assert out.name.startswith("dry-run-stage1-")
@@ -2677,7 +2679,7 @@ def test_dry_run_writes_no_latch_or_reservation_shapes(tmp_path, monkeypatch):
     assert not list(out.rglob("stage.latch"))
     summary = (out / "summary.md").read_text(encoding="utf-8")
     assert "not a measurement" in summary
-    assert "Model/API calls: 0" in summary
+    assert "Provider calls: 0. Offline fixture calls: 0." in summary
     assert "control-root state" in summary
 
 
@@ -2690,7 +2692,8 @@ def test_dry_run_never_builds_meta_client_or_dotenv(tmp_path, monkeypatch):
 
     monkeypatch.setattr(mp, "_make_pilot_dotenv_fallback", _boom)
     out, record = mp.run_dry(root, 1, spawn_fn=_dry_spawn)
-    assert record["model_calls_made"] == 0
+    assert record["provider_calls_made"] == 0
+    assert record["offline_calls_made"] == 0
     assert (out / "dry-run.json").is_file()
 
 
@@ -2761,3 +2764,171 @@ def test_live_meta_path_never_reads_dry_run_fixture(tmp_path, monkeypatch):
     assert validated == cell
     assert spec["transport"] == "meta"
     assert spec["allow_live"] is True
+
+
+# --------------------------------------------------------------------------- #
+# B5 (16): transport-scoped accounting, dry-run call accounting, CLI truth
+# --------------------------------------------------------------------------- #
+
+
+def _made_call_run(transport="fake", declared_usage=1100):
+    """Well-formed run with one made call, synthetic usage, and no sidecars."""
+    task, _, _ = _read_pinned_task(PROJECT_ROOT, "m-clean-seeded")
+    spec = build_cell_spec(mft.STAGES[1][0], task)
+    run = fake_run(spec)
+    run["transport"] = transport
+    budget = dict(run["budget"])
+    record = dict(budget["records"][0])
+    record["declared_usage"] = declared_usage
+    budget["records"] = [record]
+    budget["sidecar"] = []
+    budget["smoke_guard"] = {"enabled": True, "transport_kind": transport,
+                             "stopped": False}
+    run["budget"] = budget
+    return run
+
+
+def _spawn_run(run, spawn_info=None):
+    info = spawn_info or {"cleanup_status": "verified", "timed_out": False}
+
+    def spawn(ctx):
+        (ctx["rundir"] / "run.json").write_text(json.dumps(run), encoding="utf-8")
+        return run, info
+
+    return spawn
+
+
+def _execute_prepared_dry(tmp_path, run, spawn_info=None):
+    import harness.model_pilot as mp
+    root = make_root(tmp_path)
+    out_root = tmp_path / "out"
+    out_root.mkdir()
+    cell = list(mft.STAGES[1])[0]
+    task, rundir = mp._prepare_cell(root, cell, out_root, 0.0)
+    return mp._execute_prepared(root, cell, out_root,
+                                _spawn_run(run, spawn_info), task, rundir,
+                                transport="fake", dry_run=True)
+
+
+def test_execute_prepared_fake_made_calls_clean(tmp_path):
+    row = _execute_prepared_dry(tmp_path, _made_call_run())
+    assert row["halt"] is None, row["accounting_reasons"]
+    assert row["accounting_ok"] is True
+    assert row["provider_calls_made"] == 0
+    assert row["offline_calls_made"] == 1
+
+
+def test_pilot_accounting_fake_made_calls_ok():
+    import harness.model_pilot as mp
+    prof = mft.PROFILES["spark-medium"]
+    ok, reasons = mp.pilot_accounting_check(_made_call_run(), prof)
+    assert ok, reasons
+    assert "sidecar_correspondence_mismatch" not in reasons
+
+
+def test_pilot_accounting_meta_missing_sidecar_still_fails():
+    import harness.model_pilot as mp
+    prof = mft.PROFILES["spark-medium"]
+    ok, reasons = mp.pilot_accounting_check(
+        _made_call_run(transport="meta"), prof)
+    assert not ok
+    assert "sidecar_correspondence_mismatch" in reasons
+
+
+def test_pilot_accounting_fake_missing_declared_usage_fails():
+    import harness.model_pilot as mp
+    prof = mft.PROFILES["spark-medium"]
+    ok, reasons = mp.pilot_accounting_check(
+        _made_call_run(declared_usage=None), prof)
+    assert not ok and "fake_synthetic_usage_missing" in reasons
+
+    ok, reasons = mp.pilot_accounting_check(
+        _made_call_run(declared_usage="not-an-int"), prof)
+    assert not ok and "made_contract_invalid" in reasons
+
+
+def test_execute_prepared_fake_missing_declared_usage_halts(tmp_path):
+    row = _execute_prepared_dry(tmp_path, _made_call_run(declared_usage=None))
+    assert row["halt"] == "accounting_fake_synthetic_usage_missing"
+    assert "fake_synthetic_usage_missing" in row["accounting_reasons"]
+
+
+def test_pilot_accounting_unknown_transport_fails_closed():
+    import harness.model_pilot as mp
+    prof = mft.PROFILES["spark-medium"]
+    for transport in ("smtp", "__missing__"):
+        run = _made_call_run()
+        if transport == "__missing__":
+            run.pop("transport", None)
+        else:
+            run["transport"] = transport
+        run["budget"]["smoke_guard"]["transport_kind"] = transport
+        ok, reasons = mp.pilot_accounting_check(run, prof)
+        assert not ok
+        assert "transport_unknown" in reasons
+        assert "sidecar_correspondence_mismatch" not in reasons
+
+
+def test_pilot_accounting_refused_contract_unchanged():
+    import harness.model_pilot as mp
+    prof = mft.PROFILES["spark-medium"]
+    run = _made_call_run()
+    budget = dict(run["budget"])
+    budget["records"] = [{"call_index": 1, "kind": "intent",
+                          "status": "refused", "reserved": 10,
+                          "consumed": 5, "declared_usage": None}]
+    budget.update(calls_attempted=1, calls_made=0, calls_refused=1,
+                  reserved_tokens=10, consumed_tokens=5)
+    run["budget"] = budget
+    ok, reasons = mp.pilot_accounting_check(run, prof)
+    assert not ok and "refused_contract_invalid" in reasons
+
+
+def test_dry_run_cost_not_synthetic_halts_with_provider_zero(tmp_path, monkeypatch):
+    import harness.model_smoke as smoke
+    def fake_summary(run):
+        return {"status": "provider_measured",
+                "known_subtotal_usd_estimated": 0.01,
+                "unknown_cost_calls": 0,
+                "provider_billing_verified": False}
+    monkeypatch.setattr(smoke, "paid_cost_summary", fake_summary)
+    row = _execute_prepared_dry(tmp_path, _made_call_run())
+    assert row["halt"] == "dry_run_cost_not_synthetic"
+    assert row["provider_calls_made"] == 0
+
+
+def test_dry_run_offline_calls_invalid_become_null(tmp_path):
+    import harness.model_pilot as mp
+    for index, bad in enumerate((True, -1)):
+        run = _made_call_run()
+        run["budget"]["calls_made"] = bad
+        root = make_root(tmp_path / f"r{index}")
+        out, record = mp.run_dry(root, 1, spawn_fn=_spawn_run(run))
+        assert record["offline_calls_made"] is None
+        assert record["provider_calls_made"] == 0
+
+
+def test_dry_run_record_shape_counts(tmp_path):
+    import harness.model_pilot as mp
+    root = make_root(tmp_path)
+    out, record = mp.run_dry(root, 1, spawn_fn=_spawn_run(_made_call_run()))
+    assert record["schema"] == "dry-run-v1"
+    assert record["provider_calls_made"] == 0
+    assert record["offline_calls_made"] == 1
+    assert "model_calls_made" not in record
+    assert record["spawn"] == {"cleanup_status": "verified", "timed_out": False}
+    summary = (out / "summary.md").read_text(encoding="utf-8")
+    assert "Offline fixture calls: 1." in summary
+    assert "only provider calls could be billed" in summary
+
+
+def test_spawn_object_only_present_fields(tmp_path):
+    info = {"cleanup_status": "verified", "timed_out": False,
+            "job_assigned": True, "startup_ms": 12.5,
+            "active_before_close": 0, "active_after_terminate": 0,
+            "close_failure": True}
+    row = _execute_prepared_dry(tmp_path, _made_call_run(), spawn_info=info)
+    assert set(row["spawn"]) == {
+        "cleanup_status", "timed_out", "job_assigned", "startup_ms",
+        "active_before_close", "active_after_terminate"}
+    assert "close_failure" not in row["spawn"]

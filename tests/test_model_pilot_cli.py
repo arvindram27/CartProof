@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+import harness.model_pilot as mp
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 TRIP = PROJECT_ROOT / "tests" / "fixtures" / "pilot_tripwire"
 from harness import pilot_manifest as mft
@@ -712,3 +714,61 @@ def test_process_finalization_fault_exits_nonzero(tmp_path):
     assert not list(project.glob("var/model-pilot-stage1-*/EXPORT_PATH.txt"))
     assert list((project / "wrapper-control-normal" / "attempts" / "stage1").glob("stage.latch"))
     assert sentinel.read_text() == "preserve"
+
+
+# --------------------------------------------------------------------------- #
+# B5 (16): dry-run CLI reporter tells the truth
+# --------------------------------------------------------------------------- #
+
+
+def test_cli_dry_run_halted_exit_3(monkeypatch, capsys, tmp_path):
+    record = {"halt": "accounting_sidecar_correspondence_mismatch",
+              "execution_status": "normal", "cleanup_status": "verified",
+              "label": "L"}
+    monkeypatch.setattr(mp, "run_dry",
+                        lambda *a, **k: (tmp_path / "out", record))
+    rc = mp.main(["--stage", "1", "--dry-run"])
+    payload = json.loads(capsys.readouterr().out.strip())
+    assert rc == 3
+    assert payload["dry_run"] == "halted"
+    assert payload["halt"] == "accounting_sidecar_correspondence_mismatch"
+    assert payload["execution_status"] == "normal"
+    assert payload["cleanup_status"] == "verified"
+    assert payload["path"] == str(tmp_path / "out")
+    assert payload["label"] == "L"
+
+
+def test_cli_dry_run_complete_only_with_all_three(monkeypatch, capsys, tmp_path):
+    good = {"halt": None, "execution_status": "normal",
+            "cleanup_status": "verified", "label": "L"}
+    monkeypatch.setattr(mp, "run_dry",
+                        lambda *a, **k: (tmp_path / "out", good))
+    rc = mp.main(["--stage", "1", "--dry-run"])
+    payload = json.loads(capsys.readouterr().out.strip())
+    assert rc == 0
+    assert payload["dry_run"] == "complete"
+    assert payload["halt"] is None
+    assert set(payload) == {"dry_run", "path", "label", "halt",
+                            "execution_status", "cleanup_status"}
+
+    for bad in ({"halt": None, "execution_status": "crash",
+                 "cleanup_status": "verified", "label": "L"},
+                {"halt": None, "execution_status": "normal",
+                 "cleanup_status": "unverified", "label": "L"},
+                {"halt": "execution_crash", "execution_status": "normal",
+                 "cleanup_status": "verified", "label": "L"},
+                {}):
+        monkeypatch.setattr(
+            mp, "run_dry",
+            lambda *a, _bad=bad, **k: (tmp_path / "out", _bad))
+        rc = mp.main(["--stage", "1", "--dry-run"])
+        payload = json.loads(capsys.readouterr().out.strip())
+        assert rc == 3
+        assert payload["dry_run"] == "halted"
+
+    monkeypatch.setattr(mp, "run_dry", lambda *a, **k: (tmp_path / "out", None))
+    rc = mp.main(["--stage", "1", "--dry-run"])
+    payload = json.loads(capsys.readouterr().out.strip())
+    assert rc == 3
+    assert payload["dry_run"] == "halted"
+    assert payload["halt"] is None

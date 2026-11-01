@@ -180,8 +180,8 @@ never constructs the Meta client and never reads `.env` or
 than falling back. It never writes an attempt latch, reservation, receipt
 or control-root state. Output goes to its own labeled
 `var\dry-run-stage1-<timestamp>\` area (`dry-run.json` plus `summary.md`),
-reports zero model calls and no known cost, and says it is a plumbing check,
-not a measurement.
+records zero provider calls, the observed offline fixture call count and no
+known cost, and says it is a plumbing check, not a measurement.
 
 Its offline responses come from `eval/model/dev/fake_scripts.json`, which is
 hash-pinned in `harness/pilot_manifest.py` (`DRY_RUN_FIXTURE`, the same style
@@ -205,6 +205,15 @@ Chromium. It refuses when combined with `--live`, for any stage other than
 1, or when the offline transport is not importable. Neither the successor
 mechanism nor the dry-run changes the fresh-approval requirement for any
 paid attempt.
+
+On 2026-11-01, on this machine, the Playwright driver's temp-artifact
+creation under the profile Temp directory was denied. For one invocation,
+setting the session-scoped TEMP/TMP to a fresh project-local directory let
+that no-model dry-run reach `execution_status: normal` with
+`cleanup_status: verified`; it then halted on the accounting defect this
+brief corrects (`accounting_sidecar_correspondence_mismatch`). This is a
+single observed configuration, not a pass, a guarantee, or a permanent
+environment change.
 
 ### Scoring readout
 
