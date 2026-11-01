@@ -30,6 +30,18 @@ class CarefulAgent(ModelActor):
                 return ln
         return None
 
+    def _prepare_product_page(self, sku: str) -> None:
+        """Navigate to the SKU's product page so ``#quantity`` exists for an add."""
+        entry = next((c for c in self.catalog if c.get("sku") == sku), None)
+        if entry is None:
+            raise RuntimeError(f"sku not in catalog: {sku!r}")
+        ev = self.session.search(entry["product_name"])
+        if not (ev.payload or {}).get("results"):
+            raise RuntimeError(
+                f"no search results for {entry['product_name']!r}")
+        self.session.open_product(entry["product_id"])
+        self.session.select_variant(sku)
+
     def inspect_and_review(self) -> dict:
         """Model-controlled inspection/correction loop, then a review call."""
         steps = 0
@@ -64,9 +76,16 @@ class CarefulAgent(ModelActor):
                     "reason": proposal.error or "bad inspection proposal"})
                 break
             payload = proposal.payload
-            action = payload.get("action")
             self.inspection_actions.append(
-                {"step": steps, "action": action, "payload": payload})
+                {"step": steps, "action": payload.get("action"),
+                 "payload": payload})
+            choice = self._validate_choice(payload, available)
+            if choice is None:
+                self.failures.append({
+                    "stage": "inspection", "category": "operational",
+                    "reason": f"inspection action not in menu: {payload!r}"})
+                break
+            action = choice["action"]
 
             if action == "finish":
                 finished = True
@@ -81,14 +100,21 @@ class CarefulAgent(ModelActor):
                         "stage": "inspection", "category": "operational",
                         "reason": "inspection add cap reached (fault may persist)"})
                     break
-                ev = self.session.add_to_cart(int(payload.get("quantity", 1)),
-                                              sku=payload.get("sku"))
+                try:
+                    self._prepare_product_page(choice["sku"])
+                    ev = self.session.add_to_cart(
+                        int(choice.get("quantity", 1)), sku=choice["sku"])
+                except Exception as exc:
+                    self.failures.append({
+                        "stage": "inspection", "category": "operational",
+                        "reason": f"inspection add failed: {exc}"})
+                    break
                 self.add_statuses.append(
                     (ev.payload or {}).get("response_status"))
                 self._read_cart()
                 continue
             if action in ("set_line_quantity", "delete_line"):
-                line = self._line_for_sku(payload.get("sku"))
+                line = self._line_for_sku(choice.get("sku"))
                 if line is None:
                     self.failures.append({
                         "stage": "inspection", "category": "operational",

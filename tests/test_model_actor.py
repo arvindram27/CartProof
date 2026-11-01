@@ -227,6 +227,51 @@ def test_ca_inspection_add_cap_bounds_retries(monkeypatch):
     assert "add cap" in agent.failures[-1]["reason"]
 
 
+def test_ca_inspection_add_prepares_product_page(monkeypatch):
+    import adapter.observations as obs
+
+    class _Cart:
+        payload = {"version": 0, "lines": [], "total_cents": 0}
+
+    monkeypatch.setattr(obs, "read_api_cart", lambda session: _Cart())
+    session = StubSession()
+    responses = [INTENT] + _actions() + [
+        {"payload": {"action": "add_to_cart", "sku": "SKU-A", "quantity": 1}},
+        {"payload": {"action": "finish"}},
+        {"payload": {"declaration": "PARTIAL", "rationale": "not complete"}}]
+    agent = CarefulAgent(session, _client(responses), CATALOG, masked=False)
+    agent.resolve_intent("Add 1 x SKU-A.")
+    agent.execute_items([{"product_query": "Prod", "target_sku": "SKU-A",
+                          "quantity": 1}])
+    out = agent.inspect_and_review()
+    # The inspection add navigates to the product page before filling #quantity.
+    assert session.calls[-4:] == ["search", "open_product", "select_variant",
+                                  "add_to_cart"]
+    assert ("SKU-A", 1) in session.writes
+    assert out["declared_outcome"] == "PARTIAL"
+
+
+def test_ca_inspection_add_not_in_menu_is_refused(monkeypatch):
+    import adapter.observations as obs
+
+    class _Cart:
+        payload = {"version": 0, "lines": [], "total_cents": 0}
+
+    monkeypatch.setattr(obs, "read_api_cart", lambda session: _Cart())
+    session = StubSession()
+    responses = [INTENT] + _actions() + [
+        {"payload": {"action": "add_to_cart", "sku": "SKU-B", "quantity": 1}},
+        {"payload": {"declaration": "PARTIAL", "rationale": "refused"}}]
+    agent = CarefulAgent(session, _client(responses), CATALOG, masked=False)
+    agent.resolve_intent("Add 1 x SKU-A.")
+    agent.execute_items([{"product_query": "Prod", "target_sku": "SKU-A",
+                          "quantity": 1}])
+    out = agent.inspect_and_review()
+    assert out["declared_outcome"] == "PARTIAL"
+    assert len(session.writes) == 1  # only the execute_items add
+    assert "not in menu" in agent.failures[-1]["reason"]
+
+
 # ------------------------------------------------------------------ guard
 
 def _line(sku, qty, price=100):

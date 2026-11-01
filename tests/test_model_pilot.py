@@ -308,7 +308,7 @@ def test_shipped_successor_grant_targets_stage2():
     grant = mft.SUCCESSOR_GRANT
     assert isinstance(grant, dict)
     assert grant["stage"] == 2
-    assert grant["prior_attempt_id"] == "2b3b3975831b0682"
+    assert grant["prior_attempt_id"] == "c17f31a0d863569a"
     assert grant["accepted_prior_states"] == ("halted",)
     assert isinstance(grant["grant_id"], str) and len(grant["grant_id"]) == 32
 

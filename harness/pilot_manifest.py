@@ -146,9 +146,9 @@ ACCEPTED_STAGE1_RECEIPT: dict | None = {
 #       "accepted_prior_states": (str, ...),  # subset of complete/halted/blocked
 #   }
 SUCCESSOR_GRANT = {
-    "grant_id": "2e161444935d496c81377e339a1b66ec",
+    "grant_id": "98775d7ef09447e6baf0ebdacdb276f8",
     "stage": 2,
-    "prior_attempt_id": "2b3b3975831b0682",
+    "prior_attempt_id": "c17f31a0d863569a",
     "accepted_prior_states": ("halted",),
 }
 # conservative allowances per profile for gate arithmetic
