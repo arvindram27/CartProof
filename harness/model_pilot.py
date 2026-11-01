@@ -22,7 +22,7 @@ from harness import pilot_manifest as mft
 _ALLOWED_SPEC_KEYS = {
     "manifest_id", "protocol_version", "pilot", "pilot_stage", "pilot_cell_id",
     "setup", "fault", "arm", "trial", "fake_script", "transport",
-    "allow_live", "_startup_barrier",
+    "allow_live", "transient_fault", "_startup_barrier",
 }
 
 class PilotError(ValueError):
@@ -356,6 +356,10 @@ def build_cell_spec(cell: dict, task: dict, barrier=None, transport: str = "meta
         "fake_script": script,
         "transport": transport,
         "allow_live": transport == "meta",
+        "transient_fault": (
+            stage == 2
+            and (task.get("fault") or {}).get("name")
+            in ("silent-drop", "wrong-variant")),
     }
     if barrier is not None:
         spec["_startup_barrier"] = barrier
@@ -608,7 +612,8 @@ def pilot_run_one_cli(argv, _root=None, _execute=None, transport="meta"):
                          spec["fake_script"], str(db), str(out),
                          settle_ms=args.settle_ms, transport=transport,
                          allow_live=(transport == "meta"), smoke_guard=True,
-                         dotenv_fallback=fallback)
+                         dotenv_fallback=fallback,
+                         transient_fault=bool(spec.get("transient_fault", False)))
         run["pilot_cell_id"] = spec["pilot_cell_id"]
         run["pilot_manifest_id"] = spec["manifest_id"]
         run["transport_label"] = ("LIVE (pilot, paid attempt)"

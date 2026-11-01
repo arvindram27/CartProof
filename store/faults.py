@@ -48,6 +48,11 @@ def clear_all_faults(conn: sqlite3.Connection) -> None:
     conn.execute("DELETE FROM faults")
 
 
+def clear_fault(conn: sqlite3.Connection, name: str) -> None:
+    """Remove one active fault (used by the transient-injection path)."""
+    conn.execute("DELETE FROM faults WHERE name = ?", (name,))
+
+
 def reset_store(conn: sqlite3.Connection, catalog_path: str) -> None:
     """Clear faults, carts, sessions, snapshots and re-seed the catalog.
 

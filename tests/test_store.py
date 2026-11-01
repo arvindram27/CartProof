@@ -155,6 +155,20 @@ def test_fault_silent_drop(store):
     assert [l["sku"] for l in get_cart(c, base)["lines"]] == [SKU_A]
 
 
+def test_fault_clear_endpoint_clears_one_fault(store):
+    base, control = store["base"], store["control"]
+    c = new_client(base)
+    set_fault(control, "silent-drop")
+    add(c, base, SKU_A)
+    assert get_cart(c, base)["lines"] == []
+    r = httpx.post(f"{control}/_control/fault/clear",
+                   json={"name": "silent-drop"})
+    r.raise_for_status()
+    assert r.json() == {"ok": True, "cleared": "silent-drop"}
+    add(c, base, SKU_A)
+    assert [l["sku"] for l in get_cart(c, base)["lines"]] == [SKU_A]
+
+
 def test_fault_wrong_variant(store):
     base, control = store["base"], store["control"]
     c = new_client(base)

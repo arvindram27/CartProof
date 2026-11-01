@@ -116,7 +116,8 @@ def execute_model_run(setup: dict, fault: dict, arm: str, trial: int,
                       settle_ms: int = 2000, transport: str = "fake",
                       allow_live: bool = False, smoke_guard: bool = False,
                       environ=None, http_transport=None,
-                      dotenv_fallback=None) -> dict:
+                      dotenv_fallback=None,
+                      transient_fault: bool = False) -> dict:
     from adapter.actions import BrowserSession
     from adapter.observations import read_api_cart, read_dom_cart
     from agents.careful_agent import CarefulAgent
@@ -274,11 +275,24 @@ def execute_model_run(setup: dict, fault: dict, arm: str, trial: int,
                               "params": fault.get("params") or {}},
                         timeout=10).raise_for_status()
 
+                transient_clear = None
+                if transient_fault and fault and fault.get("name"):
+                    # Stage 2 recovery tasks model a transient injection: the
+                    # first write is faulted, the retry must be able to commit.
+                    transient_clear = {"name": fault["name"], "done": False}
+                    run["transient_fault"] = True
+
                 def hook(event):
                     kind = event.get("kind")
                     observer.record_hook_call(kind)
                     if kind in ("before_add", "after_add"):
                         observer.hook_entry(kind, event)
+                    if (kind == "after_add" and transient_clear is not None
+                            and not transient_clear["done"]):
+                        httpx.post(f"{control_url}/_control/fault/clear",
+                                   json={"name": transient_clear["name"]},
+                                   timeout=10).raise_for_status()
+                        transient_clear["done"] = True
                     if arm == "MC" and controller is not None:
                         if kind == "before_add":
                             return controller.before_add(event)

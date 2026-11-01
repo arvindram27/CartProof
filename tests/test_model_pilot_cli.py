@@ -143,7 +143,8 @@ def _bind(obj, attr, name):
 
 def _stub_execute(setup, fault, arm, trial, script, db, out,
                   settle_ms=2000, transport="meta", allow_live=False,
-                  smoke_guard=False, dotenv_fallback=None):
+                  smoke_guard=False, dotenv_fallback=None,
+                  transient_fault=False):
     root = _pl.Path(__file__).resolve().parent
     _verify_bindings(root)
     mode = (root / "fixture_mode.txt").read_text(encoding="utf-8").strip()

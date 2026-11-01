@@ -43,6 +43,16 @@ def set_fault(request: Request, body: FaultBody):
         conn.close()
 
 
+@router.post("/_control/fault/clear")
+def clear_fault_route(request: Request, body: FaultBody):
+    conn = _conn(request)
+    try:
+        faults.clear_fault(conn, body.name)
+        return {"ok": True, "cleared": body.name}
+    finally:
+        conn.close()
+
+
 @router.post("/_control/reset")
 def reset(request: Request):
     conn = _conn(request)

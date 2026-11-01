@@ -202,6 +202,31 @@ def test_ca_partial_judgment_is_respected():
     assert agent.inspect_and_review()["declared_outcome"] == "PARTIAL"
 
 
+def test_ca_inspection_add_cap_bounds_retries(monkeypatch):
+    import adapter.observations as obs
+
+    class _Cart:
+        payload = {"version": 0, "lines": [], "total_cents": 0}
+
+    monkeypatch.setattr(obs, "read_api_cart", lambda session: _Cart())
+    session = StubSession()
+    responses = [INTENT] + _actions() + [
+        {"payload": {"action": "add_to_cart", "sku": "SKU-A", "quantity": 1}}
+        for _ in range(4)
+    ] + [{"payload": {"declaration": "PARTIAL", "rationale": "cannot add"}}]
+    agent = CarefulAgent(session, _client(responses), CATALOG, masked=False)
+    agent.resolve_intent("Add 1 x SKU-A.")
+    agent.execute_items([{"product_query": "Prod", "target_sku": "SKU-A",
+                          "quantity": 1}])
+    out = agent.inspect_and_review()
+    assert out["declared_outcome"] == "PARTIAL"
+    # 1 add in execute_items + 3 bounded inspection adds; the 4th is refused
+    # before it reaches the adapter.
+    assert len(session.writes) == 4
+    assert agent.failures
+    assert "add cap" in agent.failures[-1]["reason"]
+
+
 # ------------------------------------------------------------------ guard
 
 def _line(sku, qty, price=100):

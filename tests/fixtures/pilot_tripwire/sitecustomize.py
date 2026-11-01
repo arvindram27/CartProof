@@ -33,7 +33,8 @@ except Exception:
 
 def _stub_execute(setup, fault, arm, trial, script, db, out,
                   settle_ms=2000, transport="meta", allow_live=False,
-                  smoke_guard=False, dotenv_fallback=None):
+                  smoke_guard=False, dotenv_fallback=None,
+                  transient_fault=False):
     return {
         "arm": arm, "trial": trial, "execution_status": "normal",
         "declared_outcome": "COMPLETE", "raw_stub_marker": True,

@@ -294,6 +294,24 @@ def test_run_stage_threads_receipt_only_for_stage2(monkeypatch):
     assert seen["stage"] == 2
     assert seen["receipt"] is mft.ACCEPTED_STAGE1_RECEIPT
 
+
+def test_stage2_fault_spec_marks_transient():
+    task, _, _ = _read_pinned_task(PROJECT_ROOT, "m-fault-silent-drop")
+    spec = build_cell_spec(mft.STAGES[2][0], task)
+    assert spec["transient_fault"] is True
+    clean, _, _ = _read_pinned_task(PROJECT_ROOT, "m-clean-seeded")
+    spec1 = build_cell_spec(mft.STAGES[1][0], clean)
+    assert spec1["transient_fault"] is False
+
+
+def test_shipped_successor_grant_targets_stage2():
+    grant = mft.SUCCESSOR_GRANT
+    assert isinstance(grant, dict)
+    assert grant["stage"] == 2
+    assert grant["prior_attempt_id"] == "2b3b3975831b0682"
+    assert grant["accepted_prior_states"] == ("halted",)
+    assert isinstance(grant["grant_id"], str) and len(grant["grant_id"]) == 32
+
 def test_export_safe_excludes_dbs_and_hashes_only_delivered(tmp_path):
     root = make_root(tmp_path)
     batch = _run_stage_injected(root, 1, fake_spawn, production=False, control_root=tmp_path/"pilot-control")

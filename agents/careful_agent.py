@@ -14,6 +14,7 @@ from .model_actor import ModelActor
 from .model_client import ModelRequest
 
 INSPECTION_STEP_CAP = 16
+MAX_INSPECTION_ADDS = 3
 
 
 class CarefulAgent(ModelActor):
@@ -32,6 +33,7 @@ class CarefulAgent(ModelActor):
     def inspect_and_review(self) -> dict:
         """Model-controlled inspection/correction loop, then a review call."""
         steps = 0
+        adds = 0
         finished = False
         while steps < INSPECTION_STEP_CAP and not finished:
             steps += 1
@@ -73,6 +75,12 @@ class CarefulAgent(ModelActor):
                 self._read_cart()
                 continue
             if action == "add_to_cart":
+                adds += 1
+                if adds > MAX_INSPECTION_ADDS:
+                    self.failures.append({
+                        "stage": "inspection", "category": "operational",
+                        "reason": "inspection add cap reached (fault may persist)"})
+                    break
                 ev = self.session.add_to_cart(int(payload.get("quantity", 1)),
                                               sku=payload.get("sku"))
                 self.add_statuses.append(
