@@ -114,17 +114,37 @@ class CarefulAgent(ModelActor):
                 self._read_cart()
                 continue
             if action in ("set_line_quantity", "delete_line"):
-                line = self._line_for_sku(choice.get("sku"))
+                sku = choice.get("sku")
+                line = self._line_for_sku(sku)
                 if line is None:
                     self.failures.append({
                         "stage": "inspection", "category": "operational",
-                        "reason": f"no observed line for {payload.get('sku')!r}"})
+                        "reason": f"no observed line for {sku!r}"})
                     break
                 version = (self.observed_cart or {}).get("version")
                 if action == "set_line_quantity":
+                    qty = payload.get("quantity")
+                    if isinstance(qty, bool) or not isinstance(qty, int) or qty < 1:
+                        self.failures.append({
+                            "stage": "inspection", "category": "operational",
+                            "reason": "set_line_quantity quantity must be an integer >= 1"})
+                        break
+                    intent_qty = next(
+                        (it["quantity"] for it in
+                         (self.executable_intent or {}).get("items") or []
+                         if it.get("sku") == sku), None)
+                    if intent_qty is None:
+                        self.failures.append({
+                            "stage": "inspection", "category": "operational",
+                            "reason": "set_line_quantity sku not in intent"})
+                        break
+                    if qty > intent_qty:
+                        self.failures.append({
+                            "stage": "inspection", "category": "operational",
+                            "reason": "set_line_quantity exceeds intent quantity"})
+                        break
                     self.session.set_line_quantity(
-                        line["line_id"], line["sku"],
-                        int(payload.get("quantity", 1)), version)
+                        line["line_id"], line["sku"], qty, version)
                 else:
                     self.session.delete_line(line["line_id"], line["sku"], version)
                 self._read_cart()

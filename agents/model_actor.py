@@ -127,6 +127,11 @@ class ModelActor:
                 continue
             if action == "read_cart":
                 return cand
+            if action == "finish":
+                return cand
+            if action in ("set_line_quantity", "delete_line") \
+                    and payload.get("sku") == cand["sku"]:
+                return cand
             if action == "search" and payload.get("query", cand["query"]) == cand["query"]:
                 return cand
             if action == "open_product" and payload.get("product_id") == cand["product_id"]:
