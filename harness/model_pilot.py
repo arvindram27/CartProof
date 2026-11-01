@@ -19,12 +19,6 @@ _LEXICAL_ROOT = Path(__file__).absolute().parents[1]
 
 from harness import pilot_manifest as mft
 
-BASE_HEAD = "eb06f4f93f3ad7f7a0bb1de7cd2d1451a360a6b0"
-ALLOWED_DIRTY = {
-    "harness/pilot_manifest.py", "harness/model_pilot.py", "harness/model_smoke.py",
-    "harness/model_compare.py", "tests/test_model_pilot.py",
-    "tests/test_model_pilot_cli.py", "tests/fixtures/pilot_tripwire/sitecustomize.py",
-}
 _ALLOWED_SPEC_KEYS = {
     "manifest_id", "protocol_version", "pilot", "pilot_stage", "pilot_cell_id",
     "setup", "fault", "arm", "trial", "fake_script", "transport",
@@ -711,7 +705,7 @@ def _derive_allowance(stage: int) -> float:
     return round(total, 8)
 
 def _reserve_attempt(control_root: Path, stage: int, cells: list[dict],
-                     source_digest: str) -> dict:
+                     source_digest: str, git_head: str | None = None) -> dict:
     root = _validate_control_root(Path(control_root))
     stage_dir = root / "attempts" / f"stage{stage}"
     _validate_ancestor_chain(root, stage_dir)
@@ -735,7 +729,10 @@ def _reserve_attempt(control_root: Path, stage: int, cells: list[dict],
     state = {
         "schema": 2, "attempt_id": attempt_id, "stage": stage,
         "protocol_id": mft.ATTEMPT_PROTOCOL_ID, "manifest_id": mft.MANIFEST_ID,
-        "source_digest": source_digest, "cells": [c["cell_id"] for c in cells],
+        "source_digest": source_digest,
+        "source_digest_version": mft.SOURCE_DIGEST_VERSION,
+        "git_head": git_head,
+        "cells": [c["cell_id"] for c in cells],
         "reserved_allowance_usd": _derive_allowance(stage),
         "state": "reserved", "known_cost_usd": 0.0,
         "unknown_cost_calls": 0, "unresolved_cost_state": "none",
@@ -748,19 +745,73 @@ def _reserve_attempt(control_root: Path, stage: int, cells: list[dict],
     (adir / "reservation.json").write_text(json.dumps(state, indent=2), encoding="utf-8")
     return state
 
-_SOURCE_PATHS = [
-    "harness/pilot_manifest.py", "harness/model_pilot.py", "harness/model_smoke.py",
-    "harness/model_compare.py", "tests/test_model_pilot.py",
-    "tests/test_model_pilot_cli.py", "tests/fixtures/pilot_tripwire/sitecustomize.py",
-]
+REVIEWED_SOURCE_PIN = "harness/reviewed_source.sha256"
+
+# The reviewed live-execution closure: every repo module and runtime data file
+# that can execute or be imported by a live Stage 1 pilot run (parent + worker),
+# plus the pilot's test surface. Listed order is part of the digest recipe.
+DIGEST_PATHS = (
+    "harness/__init__.py",
+    "harness/pilot_manifest.py",
+    "harness/model_pilot.py",
+    "harness/model_smoke.py",
+    "harness/model_compare.py",
+    "harness/compare.py",
+    "harness/run_task.py",
+    "harness/snapshots.py",
+    "harness/evaluate.py",
+    "harness/metrics.py",
+    "harness/model_metrics.py",
+    "agents/__init__.py",
+    "agents/careful_agent.py",
+    "agents/model_actor.py",
+    "agents/intent.py",
+    "agents/model_client.py",
+    "agents/meta_client.py",
+    "agents/env_loader.py",
+    "agents/full_cart_guard.py",
+    "agents/smoke_guard.py",
+    "adapter/__init__.py",
+    "adapter/actions.py",
+    "adapter/observations.py",
+    "adapter/evidence.py",
+    "core/__init__.py",
+    "core/ledger.py",
+    "core/checks.py",
+    "core/verify.py",
+    "core/recovery.py",
+    "store/__init__.py",
+    "store/app.py",
+    "store/api.py",
+    "store/control.py",
+    "store/faults.py",
+    "store/models.py",
+    "store/pages.py",
+    "store/seed_catalog.json",
+    "store/templates/index.html",
+    "store/templates/product.html",
+    "store/templates/cart.html",
+    "tests/test_model_pilot.py",
+    "tests/test_model_pilot_cli.py",
+    "tests/fixtures/pilot_tripwire/sitecustomize.py",
+)
 
 def compute_source_digest(root: Path) -> str:
-    chunks=[]
-    for rel in _SOURCE_PATHS:
-        data=(Path(root)/rel).read_bytes()
+    """Hash the reviewed closure over raw on-disk bytes (source-v2 recipe).
+
+    Records are `rel|len|sha256hex` in listed order. There is no newline
+    handling: a CRLF working tree hashes as CRLF. A read failure is the fixed
+    refusal category `reviewed_source_unreadable`, never a raw OSError.
+    """
+    chunks = []
+    for rel in DIGEST_PATHS:
+        try:
+            data = (Path(root) / rel).read_bytes()
+        except OSError:
+            raise PilotError("reviewed_source_unreadable")
         chunks.append(f"{rel}|{len(data)}|{hashlib.sha256(data).hexdigest()}")
-    seed = ("cartproof|" + mft.MANIFEST_ID + "|" + mft.ATTEMPT_PROTOCOL_ID + "|" + 
-            "eb06f4f93f3ad7f7a0bb1de7cd2d1451a360a6b0|" + "\n".join(chunks))
+    seed = ("cartproof|" + mft.MANIFEST_ID + "|" + mft.ATTEMPT_PROTOCOL_ID + "|"
+            "source-v" + str(mft.SOURCE_DIGEST_VERSION) + "\n" + "\n".join(chunks))
     return hashlib.sha256(seed.encode("utf-8")).hexdigest()
 
 def _persist_attempt(adir: Path, state: dict, state_name: str,
@@ -850,26 +901,78 @@ def _validate_receipt(receipt) -> dict:
 
 # ---------- preflight / runner ----------
 
-def _git_scope(root: Path):
+def _run_git(root: Path, args: list[str]) -> tuple[int, str]:
+    """Run one git query in `root`. Executor failure is a fixed refusal."""
     import subprocess
     try:
-        head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=str(root), text=True).strip()
-        status = subprocess.check_output(["git", "status", "--porcelain", "-uall"], cwd=str(root), text=True).splitlines()
+        proc = subprocess.run(["git", *args], cwd=str(root), text=True,
+                              capture_output=True, check=False)
     except Exception:
         raise PilotError("git_metadata_unavailable")
-    if head != BASE_HEAD:
-        raise PilotError("head_not_reviewed_base")
-    dirty = set()
-    for line in status:
+    return proc.returncode, proc.stdout
+
+
+def _read_reviewed_source_digest(root: Path) -> str:
+    """Parse the reviewed-source pin. Every untrusted form fails closed.
+
+    Blank lines and lines whose first non-space char is `#` are ignored; exactly
+    one remaining line must be 64 lowercase hex. The pin must be a tracked,
+    non-link file, so an ignored pin cannot be edited without a dirty signal.
+    The pin is data, never authority by itself: the reviewer recomputes the
+    digest independently from the delivered bytes.
+    """
+    path = Path(root) / REVIEWED_SOURCE_PIN
+    if _is_link(path):
+        raise PilotError("reviewed_source_pin_invalid")
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        raise PilotError("reviewed_source_pin_invalid")
+    values = [line.strip() for line in text.splitlines()]
+    values = [v for v in values if v and not v.startswith("#")]
+    if len(values) != 1 or re.fullmatch(r"[0-9a-f]{64}", values[0]) is None:
+        raise PilotError("reviewed_source_pin_invalid")
+    rc, _ = _run_git(Path(root), ["ls-files", "--error-unmatch", "--",
+                                  REVIEWED_SOURCE_PIN])
+    if rc != 0:
+        raise PilotError("reviewed_source_pin_invalid")
+    return values[0]
+
+
+def _git_scope(root: Path):
+    """Fail-closed reviewed-content scope.
+
+    Order: pin, HEAD (recorded only), clean worktree, no linked digest path,
+    digest match. HEAD is never compared.
+    """
+    pin = _read_reviewed_source_digest(Path(root))
+    rc, out = _run_git(Path(root), ["rev-parse", "HEAD"])
+    if rc != 0:
+        raise PilotError("git_metadata_unavailable")
+    head = out.strip()
+    rc, out = _run_git(Path(root), ["status", "--porcelain", "-uall"])
+    if rc != 0:
+        raise PilotError("git_metadata_unavailable")
+    for line in out.splitlines():
+        if not line:
+            continue
         path = line[3:].strip().replace("\\", "/")
-        dirty.add(path)
-        if path not in ALLOWED_DIRTY:
-            raise PilotError(f"unexpected_dirty_path:{path}")
-    return {"head": head, "dirty": sorted(dirty)}
+        if " -> " in path:
+            path = path.split(" -> ", 1)[1]
+        raise PilotError(f"worktree_dirty:{path}")
+    for rel in DIGEST_PATHS:
+        if _is_link(Path(root) / rel):
+            raise PilotError(f"reviewed_source_linked:{rel}")
+    digest = compute_source_digest(Path(root))
+    if digest != pin:
+        raise PilotError("reviewed_source_mismatch")
+    return {"head": head, "dirty": [], "digest": digest}
+
 
 def preflight_stage(root: Path, stage: int, production: bool = True) -> dict:
     if not _is_int(stage) or stage not in mft.STAGES:
         raise PilotError("stage_invalid")
+    git_head = None
     if production:
         if _lexical_abs(Path(root)) != _lexical_abs(PROJECT_ROOT):
             raise PilotError("unexpected_root")
@@ -877,7 +980,7 @@ def preflight_stage(root: Path, stage: int, production: bool = True) -> dict:
             raise PilotError("unsupported_platform")
         if not Path(sys.executable).resolve().is_relative_to((Path(root) / ".venv").resolve()):
             raise PilotError("unexpected_interpreter")
-        _git_scope(Path(root))
+        git_head = _git_scope(Path(root))["head"]
     for cell in mft.STAGES[stage]:
         task, _, _ = _read_pinned_task(root, cell["task_id"])
         if cell["arm"] not in ("CA", "MC"):
@@ -891,7 +994,7 @@ def preflight_stage(root: Path, stage: int, production: bool = True) -> dict:
     var = Path(root) / "var"
     if not var.is_dir() or _is_link(var):
         raise PilotError("var_unsafe")
-    return {"stage": stage, "cells": list(mft.STAGES[stage])}
+    return {"stage": stage, "cells": list(mft.STAGES[stage]), "git_head": git_head}
 
 def _next_allowance(profile: str) -> float:
     return mft.PROFILE_ALLOWANCE[profile]
@@ -1447,7 +1550,7 @@ def _scoring_summary_block(batch: dict) -> str:
 def _run_stage_injected(root: Path, stage: int, spawn_owned, out_root: Path | None = None,
                         receipt=None, production: bool = False, control_root: Path | None = None,
                         source_digest: str = "synthetic-test"):
-    preflight_stage(root, stage, production=production)
+    scope = preflight_stage(root, stage, production=production)
     if stage == 2:
         _validate_receipt(receipt)
         prior_known = receipt["known_cost"]
@@ -1463,7 +1566,8 @@ def _run_stage_injected(root: Path, stage: int, spawn_owned, out_root: Path | No
     _validate_above_anchor(out_root)
     _validate_mutation_chain(out_root.parent, out_root)
     attempt = _reserve_attempt(Path(control_root) if control_root else _control_root(),
-                               stage, list(mft.STAGES[stage]), source_digest)
+                               stage, list(mft.STAGES[stage]), source_digest,
+                               git_head=scope.get("git_head"))
     attempt_dir = (Path(control_root) if control_root else _control_root()) / "attempts" / f"stage{stage}" / attempt["attempt_id"]
     _persist_attempt(attempt_dir, attempt, "running")
     try:

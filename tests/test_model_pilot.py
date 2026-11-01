@@ -1,4 +1,4 @@
-import copy, hashlib, json, math, os, shutil
+import copy, hashlib, json, math, os, re, shutil
 from pathlib import Path
 import pytest
 
@@ -7,7 +7,7 @@ from harness import pilot_manifest as mft
 from harness.model_pilot import (
     PilotError, _read_pinned_task, build_cell_spec, validate_worker_spec,
     preflight_stage, _run_stage_injected, _validate_receipt, export_safe,
-    pilot_accounting_check,
+    pilot_accounting_check, compute_source_digest, DIGEST_PATHS,
 )
 
 def make_root(tmp_path):
@@ -131,8 +131,8 @@ def test_preflight_rejects_unknown_dirty_path(monkeypatch, tmp_path):
     fake_py.write_bytes(b"")
     monkeypatch.setattr(mp, "PROJECT_ROOT", root)
     monkeypatch.setattr(mp.sys, "executable", str(fake_py))
-    monkeypatch.setattr(mp, "_git_scope", lambda r: (_ for _ in ()).throw(PilotError("unexpected_dirty_path:x")))
-    with pytest.raises(PilotError, match="unexpected_dirty_path"):
+    monkeypatch.setattr(mp, "_git_scope", lambda r: (_ for _ in ()).throw(PilotError("worktree_dirty:x")))
+    with pytest.raises(PilotError, match="worktree_dirty"):
         preflight_stage(root, 1, production=True)
 
 def test_pilot_accounting_recomputes_cost(tmp_path):
@@ -2102,3 +2102,204 @@ def test_c3_unknown_cost_rollup_visible_in_batch_and_summary(tmp_path):
     assert "readout status: COMPLETE (evaluated_unreadable=0, " \
            "halted_before_evaluation=0)" in summary
     assert "| 0.0 | 1 | unresolved |" in summary
+
+
+# --------------------------------------------------------------------------- #
+# Reviewed-source content gate (source-v2)
+# --------------------------------------------------------------------------- #
+
+_FROZEN_DIGEST_PATHS = [
+    "harness/__init__.py", "harness/pilot_manifest.py", "harness/model_pilot.py",
+    "harness/model_smoke.py", "harness/model_compare.py", "harness/compare.py",
+    "harness/run_task.py", "harness/snapshots.py", "harness/evaluate.py",
+    "harness/metrics.py", "harness/model_metrics.py",
+    "agents/__init__.py", "agents/careful_agent.py", "agents/model_actor.py",
+    "agents/intent.py", "agents/model_client.py", "agents/meta_client.py",
+    "agents/env_loader.py", "agents/full_cart_guard.py", "agents/smoke_guard.py",
+    "adapter/__init__.py", "adapter/actions.py", "adapter/observations.py",
+    "adapter/evidence.py",
+    "core/__init__.py", "core/ledger.py", "core/checks.py", "core/verify.py",
+    "core/recovery.py",
+    "store/__init__.py", "store/app.py", "store/api.py", "store/control.py",
+    "store/faults.py", "store/models.py", "store/pages.py",
+    "store/seed_catalog.json", "store/templates/index.html",
+    "store/templates/product.html", "store/templates/cart.html",
+    "tests/test_model_pilot.py", "tests/test_model_pilot_cli.py",
+    "tests/fixtures/pilot_tripwire/sitecustomize.py",
+]
+
+
+def _scope_fixture(tmp_path, monkeypatch, names=("alpha.bin", "beta.bin")):
+    """Temp root with a tracked-looking pin; never touches real repo state."""
+    import harness.model_pilot as mp
+    root = tmp_path / "root"
+    (root / "harness").mkdir(parents=True)
+    for name in names:
+        (root / name).write_bytes(b"payload-" + name.encode())
+    monkeypatch.setattr(mp, "DIGEST_PATHS", tuple(names))
+    digest = mp.compute_source_digest(root)
+    (root / "harness" / "reviewed_source.sha256").write_text(
+        "# reviewed pin\n" + digest + "\n", encoding="utf-8")
+    return root, digest
+
+
+def _stub_git(monkeypatch, head="a" * 40, status="", tracked=True):
+    import harness.model_pilot as mp
+
+    def fake(root, args):
+        if args[0] == "rev-parse":
+            return 0, head + "\n"
+        if args[0] == "status":
+            return 0, status
+        if args[0] == "ls-files":
+            return (0, "harness/reviewed_source.sha256\n") if tracked else (1, "")
+        return 0, ""
+
+    monkeypatch.setattr(mp, "_run_git", fake)
+
+
+def test_source_digest_matches_shipped_pin():
+    text = (PROJECT_ROOT / "harness" / "reviewed_source.sha256").read_text(
+        encoding="utf-8")
+    found = re.search(r"^[0-9a-f]{64}$", text, re.MULTILINE)
+    assert found is not None
+    assert found.group(0) == compute_source_digest(PROJECT_ROOT)
+
+
+def test_source_digest_changes_on_byte_or_order_change(monkeypatch, tmp_path):
+    import harness.model_pilot as mp
+    root = tmp_path / "digest-root"
+    root.mkdir()
+    (root / "a.bin").write_bytes(b"one")
+    (root / "b.bin").write_bytes(b"two")
+    monkeypatch.setattr(mp, "DIGEST_PATHS", ("a.bin", "b.bin"))
+    first = mp.compute_source_digest(root)
+    monkeypatch.setattr(mp, "DIGEST_PATHS", ("b.bin", "a.bin"))
+    assert mp.compute_source_digest(root) != first
+    (root / "a.bin").write_bytes(b"one!")
+    monkeypatch.setattr(mp, "DIGEST_PATHS", ("a.bin", "b.bin"))
+    assert mp.compute_source_digest(root) != first
+
+
+def test_digest_paths_equal_frozen_closure():
+    assert list(DIGEST_PATHS) == _FROZEN_DIGEST_PATHS
+    assert len(DIGEST_PATHS) == 43
+
+
+def test_git_scope_refuses_dirty_worktree(monkeypatch, tmp_path):
+    import harness.model_pilot as mp
+    root, _ = _scope_fixture(tmp_path, monkeypatch)
+    _stub_git(monkeypatch, status=" M harness/model_pilot.py\n")
+    with pytest.raises(PilotError, match=r"^worktree_dirty:harness/model_pilot\.py$"):
+        mp._git_scope(root)
+
+
+def test_git_scope_refuses_digest_mismatch(monkeypatch, tmp_path):
+    import harness.model_pilot as mp
+    root, _ = _scope_fixture(tmp_path, monkeypatch)
+    _stub_git(monkeypatch)
+    (root / "alpha.bin").write_bytes(b"changed-after-pin")
+    with pytest.raises(PilotError, match="reviewed_source_mismatch"):
+        mp._git_scope(root)
+
+
+def test_git_scope_records_head_without_comparing(monkeypatch, tmp_path):
+    import harness.model_pilot as mp
+    root, digest = _scope_fixture(tmp_path, monkeypatch)
+    _stub_git(monkeypatch, head="f" * 40)
+    scope = mp._git_scope(root)
+    assert scope["head"] == "f" * 40
+    assert scope["digest"] == digest
+    assert scope["dirty"] == []
+
+
+def test_pin_parser_rejects_missing_or_malformed(monkeypatch, tmp_path):
+    import harness.model_pilot as mp
+    root, digest = _scope_fixture(tmp_path, monkeypatch)
+    pin = root / "harness" / "reviewed_source.sha256"
+    _stub_git(monkeypatch)
+
+    pin.unlink()
+    with pytest.raises(PilotError, match="reviewed_source_pin_invalid"):
+        mp._git_scope(root)
+
+    pin.write_text("# comment\nnot-a-digest\n", encoding="utf-8")
+    with pytest.raises(PilotError, match="reviewed_source_pin_invalid"):
+        mp._git_scope(root)
+
+    pin.write_text(digest + "\n" + digest + "\n", encoding="utf-8")
+    with pytest.raises(PilotError, match="reviewed_source_pin_invalid"):
+        mp._git_scope(root)
+
+    pin.write_text(digest + "\n", encoding="utf-8")
+    _stub_git(monkeypatch, tracked=False)
+    with pytest.raises(PilotError, match="reviewed_source_pin_invalid"):
+        mp._git_scope(root)
+
+    _stub_git(monkeypatch)
+    monkeypatch.setattr(mp, "_is_link", lambda p: True)
+    with pytest.raises(PilotError, match="reviewed_source_pin_invalid"):
+        mp._git_scope(root)
+
+
+def test_git_scope_refuses_linked_path(monkeypatch, tmp_path):
+    import harness.model_pilot as mp
+    root, _ = _scope_fixture(tmp_path, monkeypatch)
+    _stub_git(monkeypatch)
+    real_is_link = mp._is_link
+    monkeypatch.setattr(
+        mp, "_is_link",
+        lambda p: True if Path(p).name == "beta.bin" else real_is_link(p))
+    with pytest.raises(PilotError, match=r"reviewed_source_linked:beta\.bin$"):
+        mp._git_scope(root)
+
+
+def test_digest_refuses_unreadable_path(monkeypatch, tmp_path):
+    import harness.model_pilot as mp
+    root = tmp_path / "missing-root"
+    root.mkdir()
+    monkeypatch.setattr(mp, "DIGEST_PATHS", ("missing.bin",))
+    with pytest.raises(PilotError, match="reviewed_source_unreadable"):
+        mp.compute_source_digest(root)
+
+
+def test_git_scope_refuses_git_failure(monkeypatch, tmp_path):
+    import harness.model_pilot as mp
+    root, _ = _scope_fixture(tmp_path, monkeypatch)
+
+    def failing(root_arg, args):
+        if args[0] == "ls-files":
+            return 0, "harness/reviewed_source.sha256\n"
+        return 1, ""
+
+    monkeypatch.setattr(mp, "_run_git", failing)
+    with pytest.raises(PilotError, match="git_metadata_unavailable"):
+        mp._git_scope(root)
+
+
+def test_reservation_records_provenance_and_accepts_old_format(tmp_path):
+    import harness.model_pilot as mp
+    root = make_root(tmp_path)
+    _run_stage_injected(root, 1, fake_spawn, production=False,
+                        control_root=tmp_path / "ctl-prov")
+    reservations = list((tmp_path / "ctl-prov" / "attempts" / "stage1").rglob(
+        "reservation.json"))
+    assert len(reservations) == 1
+    new_res = json.loads(reservations[0].read_text(encoding="utf-8"))
+    assert new_res["source_digest_version"] == mft.SOURCE_DIGEST_VERSION == 2
+    assert "git_head" in new_res and new_res["git_head"] is None
+
+    adir = tmp_path / "ctl-old" / "attempts" / "stage1" / "legacy01"
+    adir.mkdir(parents=True)
+    old = {"schema": 2, "attempt_id": "legacy01", "stage": 1,
+           "protocol_id": mft.ATTEMPT_PROTOCOL_ID,
+           "manifest_id": mft.MANIFEST_ID, "source_digest": "legacy-digest",
+           "cells": [], "state": "reserved"}
+    (adir / "reservation.json").write_text(json.dumps(old), encoding="utf-8")
+    accepted = mp._persist_attempt(adir, old, "running")
+    assert accepted["state"] == "running"
+    assert accepted["source_digest"] == "legacy-digest"
+    assert "git_head" not in accepted
+    assert "source_digest_version" not in accepted
+    reread = json.loads((adir / "reservation.json").read_text(encoding="utf-8"))
+    assert reread["state"] == "running"

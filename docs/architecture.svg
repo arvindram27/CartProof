@@ -62,8 +62,8 @@
 
     <rect x="330" y="264" width="284" height="72" rx="8" fill="#ffffff" stroke="#6d28d9"/>
     <text x="344" y="288" font-size="13" font-weight="bold" fill="#111827">Git preflight</text>
-    <text x="344" y="306" font-size="10.5" fill="#374151">HEAD pinned to BASE_HEAD eb06f4f;</text>
-    <text x="344" y="320" font-size="10.5" fill="#374151">seven-file dirty allowance, else refuse.</text>
+    <text x="344" y="306" font-size="10.5" fill="#374151">Reviewed-source digest pinned for the 43</text>
+    <text x="344" y="320" font-size="10.5" fill="#374151">live paths; HEAD recorded, not compared.</text>
 
     <rect x="632" y="264" width="284" height="72" rx="8" fill="#ffffff" stroke="#6d28d9"/>
     <text x="646" y="288" font-size="13" font-weight="bold" fill="#111827">Cost gate</text>

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 MANIFEST_ID = "cartproof-dev-comparison-2026-10-31.1"
 ATTEMPT_PROTOCOL_ID = "pilot-attempt-v1"
+SOURCE_DIGEST_VERSION = 2
 PROTOCOL_VERSION = 1
 BASE_URL = "https://api.meta.ai/v1"
 PRIOR_SMOKE_ESTIMATE_USD = 0.0132445

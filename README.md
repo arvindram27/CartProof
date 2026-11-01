@@ -106,12 +106,26 @@ https://dev.meta.ai/docs/pricing-rate-limits on 2026-10-31.
   allowance that includes the prior smoke estimate ($0.0132445). The
   Stage 1 local allowance is $0.97 (2 Spark + 2 Wonder cells at the
   manifest's per-profile allowances).
-- Git preflight: live runs pin `BASE_HEAD`
-  `eb06f4f93f3ad7f7a0bb1de7cd2d1451a360a6b0` with a seven-file dirty
-  allowance for the pilot sources; any other dirty path refuses the run.
-  This publication commit moves the repository HEAD off the pinned
-  BASE_HEAD, so the live preflight will refuse future live runs until a
-  separate gate-alignment review. Publishing is not live approval.
+- Content gate: live runs require a fully clean worktree and require the
+  on-disk bytes of the 43-path live-execution closure (`DIGEST_PATHS` in
+  `harness/model_pilot.py`) to match the digest pinned in
+  `harness/reviewed_source.sha256`. `HEAD` is recorded in the attempt
+  reservation as provenance, never compared, so publication no longer
+  blocks a live run. The earlier `BASE_HEAD` pin allowed seven files to be
+  dirty, so it never byte-pinned them; the digest covers them like every
+  other reviewed byte. The pin is checkout-specific: this working tree is a
+  mix of LF and CRLF bytes (`core.autocrlf=true`), so the digest commits to
+  those exact bytes and must be recomputed if the EOL policy or the checkout
+  changes. Review, not cryptography, is the boundary: the pin
+  is data, and the reviewer recomputes the digest from the delivered bytes
+  before approving any commit.
+
+  Source-v2 recipe: for each path in `DIGEST_PATHS`, in listed order,
+  record `rel|len|sha256hex` over the raw on-disk bytes (`read_bytes()`,
+  no newline handling); seed
+  `"cartproof|" + MANIFEST_ID + "|" + ATTEMPT_PROTOCOL_ID + "|source-v" +
+  str(SOURCE_DIGEST_VERSION) + "\n" + records joined by newline`; the
+  digest is the SHA-256 of the UTF-8 seed.
 - Transport: `agents/meta_client.py` fails closed before reading the key
   unless every live gate passes, and never retries. The API key comes from
   the `MODEL_API_KEY` environment variable first; the sanitized loader in
