@@ -9,7 +9,8 @@ from harness.model_pilot import (
     PilotError, _read_pinned_task, build_cell_spec, validate_worker_spec,
     preflight_stage, _run_stage_injected, _validate_receipt, export_safe,
     pilot_accounting_check, compute_source_digest, DIGEST_PATHS,
-    _reserve_attempt, run_dry,
+    _reserve_attempt, run_dry, _SUCCESSOR_GRANT_KEYS,
+    _TERMINAL_ATTEMPT_STATES, _ATTEMPT_ID_RE,
 )
 
 def make_root(tmp_path):
@@ -304,13 +305,24 @@ def test_stage2_fault_spec_marks_transient():
     assert spec1["transient_fault"] is False
 
 
-def test_shipped_successor_grant_targets_stage2():
+def test_shipped_successor_grant_shape():
+    # The armed grant rotates with each reviewed attempt, so pin the
+    # STRUCTURAL contract of the shipped constant, never a specific grant
+    # or prior attempt ID. Refusal of malformed grants and every
+    # prior-chain check are covered by the monkeypatched test_successor_*
+    # tests below; this guard keeps the armed value well-formed.
     grant = mft.SUCCESSOR_GRANT
-    assert isinstance(grant, dict)
-    assert grant["stage"] == 2
-    assert grant["prior_attempt_id"] == "c17f31a0d863569a"
-    assert grant["accepted_prior_states"] == ("halted",)
-    assert isinstance(grant["grant_id"], str) and len(grant["grant_id"]) == 32
+    if grant is None:  # no grant armed: deny-by-default is a valid state
+        return
+    assert set(grant.keys()) == _SUCCESSOR_GRANT_KEYS
+    assert isinstance(grant["grant_id"], str) and grant["grant_id"]
+    assert all(c in "0123456789abcdef" for c in grant["grant_id"])
+    assert grant["stage"] in mft.STAGES
+    assert _ATTEMPT_ID_RE.fullmatch(grant["prior_attempt_id"])
+    assert isinstance(grant["accepted_prior_states"], (list, tuple))
+    assert grant["accepted_prior_states"]
+    assert all(isinstance(s, str) and s in _TERMINAL_ATTEMPT_STATES
+               for s in grant["accepted_prior_states"])
 
 def test_export_safe_excludes_dbs_and_hashes_only_delivered(tmp_path):
     root = make_root(tmp_path)

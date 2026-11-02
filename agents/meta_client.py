@@ -77,7 +77,7 @@ SCHEMAS = {
                 "type": "object", "additionalProperties": False,
                 "required": ["sku", "quantity"],
                 "properties": {
-                    "sku": {"type": "string", "minLength": 1},
+                    "sku": {"type": "string", "minLength": 1, "maxLength": 64},
                     "quantity": {"type": "integer", "minimum": 1,
                                  "maximum": 99}}}},
             "budget_max_cents": {"type": ["integer", "null"], "minimum": 0},
@@ -89,9 +89,9 @@ SCHEMAS = {
             "action": {"type": "string", "enum": [
                 "search", "open_product", "select_variant", "add_to_cart",
                 "read_cart", "set_line_quantity", "delete_line", "finish"]},
-            "query": {"type": ["string", "null"]},
-            "product_id": {"type": ["string", "null"]},
-            "sku": {"type": ["string", "null"]},
+            "query": {"type": ["string", "null"], "maxLength": 256},
+            "product_id": {"type": ["string", "null"], "maxLength": 64},
+            "sku": {"type": ["string", "null"], "maxLength": 64},
             "quantity": {"type": ["integer", "null"], "minimum": 1,
                          "maximum": 99}}},
     "review": {
@@ -100,7 +100,7 @@ SCHEMAS = {
         "properties": {
             "declaration": {"type": "string",
                             "enum": ["COMPLETE", "PARTIAL"]},
-            "rationale": {"type": ["string", "null"]}}},
+            "rationale": {"type": ["string", "null"], "maxLength": 2000}}},
 }
 
 _RELEVANT_FIELDS = {
