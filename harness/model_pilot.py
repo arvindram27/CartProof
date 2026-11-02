@@ -1092,11 +1092,23 @@ DIGEST_PATHS = (
     "store/templates/product.html",
     "store/templates/cart.html",
     "store/mcp_server.py",
+    "store/cart_backend.py",
+    "store/backends.py",
+    "store/mcp_server_v2.py",
     "tests/test_model_pilot.py",
     "tests/test_model_pilot_cli.py",
     "tests/test_mcp_server.py",
     "tests/test_mcp_server_mutations.py",
+    "tests/shopify_fake.py",
+    "tests/test_cart_backends.py",
+    "tests/test_cartproof_check_v2.py",
+    "tests/test_mcp_server_v2.py",
     "tests/fixtures/pilot_tripwire/sitecustomize.py",
+    "tests/fixtures/shopify/README.md",
+    "tests/fixtures/shopify/cart_create.json",
+    "tests/fixtures/shopify/cart_query.json",
+    "tests/fixtures/shopify/cart_lines_add.json",
+    "tests/fixtures/shopify/mapping.json",
 )
 
 def compute_source_digest(root: Path) -> str:

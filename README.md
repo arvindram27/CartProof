@@ -346,3 +346,13 @@ privately create `.env` in the project root containing a single
 `MODEL_API_KEY` assignment line, using a local editor with AI assistance
 disabled. Saving `.env` never authorizes live use; a live smoke still needs
 its own separate approval.
+
+## MCP tools and Shopify adapter status
+
+CartProof exposes raw mock-store cart tools and a callable cartproof_check over MCP. The check compares the cart with the frozen starting state and requested changes, reporting COMPLETE, PARTIAL or UNKNOWN. Calling the check is optional; the MCP tools do not automatically enforce CartProof's protection rules.
+
+The new backend interface supports an offline Shopify adapter. Its responses and failure handling are tested using a stateful fake and adapted documentation fixtures, not a live Shopify connection. The v2 tool responses use canonical cart state and include provenance; they are not drop-in copies of the original server's responses.
+
+Saved Windows test logs from November 2, 2026 record 33 focused tests passed and 594 passed / 5 skipped in the full suite.
+
+Still pending: live Shopify compatibility, agent integration over the new interface, and latency measurement. The Shopify adapter has no atomic cart-version guard; its check is after-the-fact detection, not prevention.

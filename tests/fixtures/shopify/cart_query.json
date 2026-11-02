@@ -1,0 +1,31 @@
+{
+  "data": {
+    "cart": {
+      "id": "gid://shopify/Cart/Z2NwLXVzLWV4YW1wbGU6MDEyMzQ1Njc4OTAxMjM0NTY3ODkw?key=examplekey1234567890",
+      "createdAt": "2021-06-11T14:46:44Z",
+      "updatedAt": "2021-06-11T14:46:44Z",
+      "lines": {
+        "edges": [
+          {
+            "node": {
+              "id": "gid://shopify/CartLine/1",
+              "quantity": 1,
+              "merchandise": {
+                "id": "gid://shopify/ProductVariant/1"
+              },
+              "attributes": [
+                {
+                  "key": "engraving",
+                  "value": "This is an engraving"
+                }
+              ]
+            }
+          }
+        ],
+        "pageInfo": {
+          "hasNextPage": false
+        }
+      }
+    }
+  }
+}

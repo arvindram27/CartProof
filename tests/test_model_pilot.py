@@ -2265,9 +2265,21 @@ _FROZEN_DIGEST_PATHS = [
     "store/seed_catalog.json", "store/templates/index.html",
     "store/templates/product.html", "store/templates/cart.html",
     "store/mcp_server.py",
+    "store/cart_backend.py",
+    "store/backends.py",
+    "store/mcp_server_v2.py",
     "tests/test_model_pilot.py", "tests/test_model_pilot_cli.py",
     "tests/test_mcp_server.py", "tests/test_mcp_server_mutations.py",
+    "tests/shopify_fake.py",
+    "tests/test_cart_backends.py",
+    "tests/test_cartproof_check_v2.py",
+    "tests/test_mcp_server_v2.py",
     "tests/fixtures/pilot_tripwire/sitecustomize.py",
+    "tests/fixtures/shopify/README.md",
+    "tests/fixtures/shopify/cart_create.json",
+    "tests/fixtures/shopify/cart_query.json",
+    "tests/fixtures/shopify/cart_lines_add.json",
+    "tests/fixtures/shopify/mapping.json",
 ]
 
 
@@ -2345,7 +2357,7 @@ def test_source_digest_changes_on_byte_or_order_change(monkeypatch, tmp_path):
 
 def test_digest_paths_equal_frozen_closure():
     assert list(DIGEST_PATHS) == _FROZEN_DIGEST_PATHS
-    assert len(DIGEST_PATHS) == 46
+    assert len(DIGEST_PATHS) == 58
 
 
 def test_git_scope_refuses_dirty_worktree(monkeypatch, tmp_path):

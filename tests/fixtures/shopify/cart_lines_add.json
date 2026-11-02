@@ -1,0 +1,27 @@
+{
+  "data": {
+    "cartLinesAdd": {
+      "cart": {
+        "id": "gid://shopify/Cart/Z2NwLXVzLWV4YW1wbGU6MDEyMzQ1Njc4OTAxMjM0NTY3ODkw?key=examplekey1234567890",
+        "lines": {
+          "edges": [
+            {
+              "node": {
+                "id": "gid://shopify/CartLine/1",
+                "quantity": 3,
+                "merchandise": {
+                  "id": "gid://shopify/ProductVariant/1"
+                }
+              }
+            }
+          ],
+          "pageInfo": {
+            "hasNextPage": false
+          }
+        }
+      },
+      "userErrors": [],
+      "warnings": []
+    }
+  }
+}
