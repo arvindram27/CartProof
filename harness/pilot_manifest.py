@@ -82,6 +82,8 @@ STAGES = {
         {"cell_id": "s1-seeded-ca-wonder", "task_id": "m-clean-seeded", "arm": "CA", "profile": "wonder-medium"},
         {"cell_id": "s1-ambig-ca-wonder", "task_id": "m-under-ambiguous-size", "arm": "CA", "profile": "wonder-medium"},
         {"cell_id": "s1-ambig-ca-spark", "task_id": "m-under-ambiguous-size", "arm": "CA", "profile": "spark-medium"},
+        {"cell_id": "s1-seeded-mc-spark", "task_id": "m-clean-seeded", "arm": "MC", "profile": "spark-medium"},
+        {"cell_id": "s1-seeded-mc-wonder", "task_id": "m-clean-seeded", "arm": "MC", "profile": "wonder-medium"},
     ),
     2: (
         {"cell_id": "s2-drop-ca-spark", "task_id": "m-fault-silent-drop", "arm": "CA", "profile": "spark-medium"},

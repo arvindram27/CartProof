@@ -86,7 +86,8 @@ def test_stage2_carries_canonical_fault():
 def test_stage_orders_fixed():
     assert [c["cell_id"] for c in mft.STAGES[1]] == [
         "s1-seeded-ca-spark", "s1-seeded-ca-wonder",
-        "s1-ambig-ca-wonder", "s1-ambig-ca-spark"]
+        "s1-ambig-ca-wonder", "s1-ambig-ca-spark",
+        "s1-seeded-mc-spark", "s1-seeded-mc-wonder"]
     assert [c["cell_id"] for c in mft.STAGES[2]][:4] == [
         "s2-drop-ca-spark", "s2-drop-ca-wonder",
         "s2-drop-mc-wonder", "s2-drop-mc-spark"]
@@ -206,7 +207,7 @@ def test_injected_stage1_complete_and_raw_preserved(tmp_path):
     batch = _run_stage_injected(root, 1, fake_spawn, production=False, control_root=tmp_path/"pilot-control")
     data = json.loads((batch / "batch.json").read_text())
     assert data["status"] == "complete" and data["transport_label"] == "FAKE (injected)"
-    assert len(data["cells"]) == 4
+    assert len(data["cells"]) == 6
     raw = json.loads((batch / "cells" / "s1-seeded-ca-spark" / "run.json").read_text())
     assert raw.get("raw_marker") is True
     assert "task_id" not in raw
@@ -239,12 +240,36 @@ def test_stage2_closed_and_receipt_shape(tmp_path, monkeypatch):
         _validate_receipt({})
 
 
+def _valid_six_cell_receipt():
+    """Structurally valid receipt for the expanded six-cell stage 1.
+
+    The reviewed 4-cell ACCEPTED_STAGE1_RECEIPT is intentionally stale after
+    the seeded MC cells were added: stage-2 admission stays suspended until a
+    new 6-cell receipt is adopted from a future reviewed run. This fixture is
+    for exercising the validator, not for adoption.
+    """
+    base = mft.ACCEPTED_STAGE1_RECEIPT
+    receipt = copy.deepcopy(base)
+    cells = [c["cell_id"] for c in mft.STAGES[1]]
+    hashes = {k: v for k, v in base["file_hashes"].items()
+              if k in ("batch.json", "ledger.json", "summary.md",
+                       "manifest.json")}
+    for cid in cells:
+        for name in ("run.json", "evaluated.json", "secret-scan.txt"):
+            hashes[f"cells/{cid}/{name}"] = "0" * 64
+    receipt["cells"] = cells
+    receipt["file_hashes"] = hashes
+    return receipt
+
+
 def test_reviewed_receipt_shape_matches_constants():
-    receipt = mft.ACCEPTED_STAGE1_RECEIPT
-    assert isinstance(receipt, dict)
-    assert set(receipt) == {"receipt_id", "manifest_id", "stage", "status",
-                            "known_cost", "unknown_cost_calls", "cells",
-                            "file_hashes"}
+    # The 4-cell reviewed receipt predates the seeded MC cells. Per the P35
+    # decision, stage-2 admission is suspended (receipt_cells_invalid) until
+    # a new 6-cell receipt is adopted from a future reviewed run.
+    with pytest.raises(PilotError, match="receipt_cells_invalid"):
+        _validate_receipt(mft.ACCEPTED_STAGE1_RECEIPT)
+    receipt = _valid_six_cell_receipt()
+    assert _validate_receipt(receipt) is receipt
     assert receipt["receipt_id"] == mft.ACCEPTED_STAGE1_RECEIPT_ID
     assert receipt["manifest_id"] == mft.ACCEPTED_STAGE1_MANIFEST_ID
     assert receipt["stage"] == 1
@@ -256,11 +281,11 @@ def test_reviewed_receipt_shape_matches_constants():
         expected |= {f"cells/{cid}/run.json", f"cells/{cid}/evaluated.json",
                      f"cells/{cid}/secret-scan.txt"}
     assert set(receipt["file_hashes"]) == expected
-    assert len(receipt["file_hashes"]) == 16
+    assert len(receipt["file_hashes"]) == 22
 
 
 def test_receipt_id_mismatch_refused():
-    bad = dict(mft.ACCEPTED_STAGE1_RECEIPT)
+    bad = _valid_six_cell_receipt()
     bad["receipt_id"] = "not-the-reviewed-id"
     with pytest.raises(PilotError, match="receipt_id_mismatch"):
         _validate_receipt(bad)
@@ -268,15 +293,15 @@ def test_receipt_id_mismatch_refused():
 
 def test_stage2_accepts_reviewed_receipt(tmp_path):
     root = make_root(tmp_path)
+    receipt = _valid_six_cell_receipt()
     batch = _run_stage_injected(root, 2, fake_spawn, production=False,
                                 control_root=tmp_path / "pilot-control-stage2",
-                                receipt=mft.ACCEPTED_STAGE1_RECEIPT)
+                                receipt=receipt)
     data = json.loads((batch / "batch.json").read_text(encoding="utf-8"))
     assert data["status"] == "complete"
     assert data["stage"] == 2
     assert len(data["cells"]) == 8
-    assert data["known_cost_usd_estimated"] >= \
-        mft.ACCEPTED_STAGE1_RECEIPT["known_cost"]
+    assert data["known_cost_usd_estimated"] >= receipt["known_cost"]
 
 
 def test_run_stage_threads_receipt_only_for_stage2(monkeypatch):
@@ -951,7 +976,7 @@ def test_stage_last_cell_halt_full_selection_candidate_normal(tmp_path):
     calls = {"n": 0}
     def last_bad(ctx):
         calls["n"] += 1
-        if calls["n"] == 4:
+        if calls["n"] == 6:
             (ctx["rundir"] / "run.json").write_text(
                 json.dumps({"execution_status": "timeout"}), encoding="utf-8")
             return {"execution_status": "timeout"}, {"cleanup_status": "terminated"}
@@ -1971,6 +1996,16 @@ def test_scoring_readout_per_profile_frozen_in_batch_and_summary(tmp_path):
         "s1-ambig-ca-spark": _persisted_spawn(
             declared="CLARIFY", outcome_kind="semantic_clarify",
             db_lines=[("BTL-HIK-500-NAVY", 1)]),
+        "s1-seeded-mc-spark": _persisted_spawn(
+            declared="COMPLETE", outcome_kind="proceed",
+            exec_items=[("BTL-HIK-750-STEEL", 1)], completed=[0],
+            db_lines=[("BTL-HIK-500-NAVY", 1),
+                      ("BTL-HIK-750-STEEL", 1)]),
+        "s1-seeded-mc-wonder": _persisted_spawn(
+            declared="COMPLETE", outcome_kind="proceed",
+            exec_items=[("BTL-HIK-750-STEEL", 1)], completed=[0],
+            db_lines=[("BTL-HIK-500-NAVY", 1),
+                      ("BTL-HIK-750-STEEL", 1)]),
     })
     batch = _run_stage_injected(root, 1, spawn, production=False,
                                 control_root=tmp_path / "ctl-readout")
@@ -1981,21 +2016,21 @@ def test_scoring_readout_per_profile_frozen_in_batch_and_summary(tmp_path):
     spark = readout["profiles"]["spark-medium"]
     wonder = readout["profiles"]["wonder-medium"]
     assert spark == {
-        "cells_run": 2, "task_appropriate": 2, "correct_clarification": 1,
-        "physical_correct": 2,
-        "declared_complete": {"verified": 1, "known_false": 0,
+        "cells_run": 3, "task_appropriate": 3, "correct_clarification": 1,
+        "physical_correct": 3,
+        "declared_complete": {"verified": 2, "known_false": 0,
                               "unverified": 0},
         "evaluated_unreadable": 0, "halted_before_evaluation": 0,
-        "known_cost_usd_estimated": 0.00335, "unknown_cost_calls": 0,
+        "known_cost_usd_estimated": 0.005025, "unknown_cost_calls": 0,
         "unresolved_cost_state": "none",
     }
     assert wonder == {
-        "cells_run": 2, "task_appropriate": 0, "correct_clarification": 0,
-        "physical_correct": 0,
-        "declared_complete": {"verified": 0, "known_false": 1,
+        "cells_run": 3, "task_appropriate": 1, "correct_clarification": 0,
+        "physical_correct": 1,
+        "declared_complete": {"verified": 1, "known_false": 1,
                               "unverified": 1},
         "evaluated_unreadable": 0, "halted_before_evaluation": 0,
-        "known_cost_usd_estimated": 0.012, "unknown_cost_calls": 0,
+        "known_cost_usd_estimated": 0.018, "unknown_cost_calls": 0,
         "unresolved_cost_state": "none",
     }
     # Cost beside the scoring counts is the existing per-cell cost rolled up.
@@ -2011,10 +2046,10 @@ def test_scoring_readout_per_profile_frozen_in_batch_and_summary(tmp_path):
     assert SCORING_READOUT_LABEL in summary
     assert "readout status: COMPLETE (evaluated_unreadable=0, " \
            "halted_before_evaluation=0)" in summary
-    assert "| spark-medium | 2 | 2 | 1 | 2 | 1 | 0 | 0 | 0 | 0 | " \
-           "0.00335 | 0 | none |" in summary
-    assert "| wonder-medium | 2 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | " \
-           "0.012 | 0 | none |" in summary
+    assert "| spark-medium | 3 | 3 | 1 | 3 | 2 | 0 | 0 | 0 | 0 | " \
+           "0.005025 | 0 | none |" in summary
+    assert "| wonder-medium | 3 | 1 | 0 | 1 | 1 | 1 | 1 | 0 | 0 | " \
+           "0.018 | 0 | none |" in summary
 
     # Frozen with the batch before publication, and published bytes match.
     exported = batch / "export"
@@ -2061,13 +2096,23 @@ def test_c1_unreadable_evaluated_record_visible_in_batch_and_summary(tmp_path):
         "s1-ambig-ca-spark": _persisted_spawn(
             declared="CLARIFY", outcome_kind="semantic_clarify",
             db_lines=[("BTL-HIK-500-NAVY", 1)]),
+        "s1-seeded-mc-spark": _persisted_spawn(
+            declared="COMPLETE", outcome_kind="proceed",
+            exec_items=[("BTL-HIK-750-STEEL", 1)], completed=[0],
+            db_lines=[("BTL-HIK-500-NAVY", 1),
+                      ("BTL-HIK-750-STEEL", 1)]),
+        "s1-seeded-mc-wonder": _persisted_spawn(
+            declared="COMPLETE", outcome_kind="proceed",
+            exec_items=[("BTL-HIK-750-STEEL", 1)], completed=[0],
+            db_lines=[("BTL-HIK-500-NAVY", 1),
+                      ("BTL-HIK-750-STEEL", 1)]),
     })
     batch = _run_stage_injected(root, 1, spawn, production=False,
                                 control_root=tmp_path / "ctl-c1")
     data = json.loads((batch / "batch.json").read_text(encoding="utf-8"))
     # The batch still publishes; the corrupted cell is not dropped.
     assert data["status"] == "complete"
-    assert len(data["cells"]) == 4
+    assert len(data["cells"]) == 6
     _data, corrupted_row = _row_for(batch, "s1-seeded-ca-spark")
     assert corrupted_row["worker_output"] is True
     assert corrupted_row["halt"] is None
@@ -2076,28 +2121,28 @@ def test_c1_unreadable_evaluated_record_visible_in_batch_and_summary(tmp_path):
     assert readout["status"] == "incomplete"
     spark = readout["profiles"]["spark-medium"]
     assert spark == {
-        "cells_run": 2, "task_appropriate": 1, "correct_clarification": 1,
-        "physical_correct": 1,
-        "declared_complete": {"verified": 0, "known_false": 0,
+        "cells_run": 3, "task_appropriate": 2, "correct_clarification": 1,
+        "physical_correct": 2,
+        "declared_complete": {"verified": 1, "known_false": 0,
                               "unverified": 0},
         "evaluated_unreadable": 1, "halted_before_evaluation": 0,
-        "known_cost_usd_estimated": 0.00335, "unknown_cost_calls": 0,
+        "known_cost_usd_estimated": 0.005025, "unknown_cost_calls": 0,
         "unresolved_cost_state": "none",
     }
     # Other cells still count normally.
     wonder = readout["profiles"]["wonder-medium"]
     assert wonder["evaluated_unreadable"] == 0
     assert wonder["halted_before_evaluation"] == 0
-    assert wonder["declared_complete"] == {"verified": 0, "known_false": 1,
+    assert wonder["declared_complete"] == {"verified": 1, "known_false": 1,
                                            "unverified": 1}
 
     summary = (batch / "summary.md").read_text(encoding="utf-8")
     assert "readout status: INCOMPLETE (evaluated_unreadable=1, " \
            "halted_before_evaluation=0)" in summary
-    assert "| spark-medium | 2 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 0 | " \
-           "0.00335 | 0 | none |" in summary
-    assert "| wonder-medium | 2 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | " \
-           "0.012 | 0 | none |" in summary
+    assert "| spark-medium | 3 | 2 | 1 | 2 | 1 | 0 | 0 | 1 | 0 | " \
+           "0.005025 | 0 | none |" in summary
+    assert "| wonder-medium | 3 | 1 | 0 | 1 | 1 | 1 | 1 | 0 | 0 | " \
+           "0.018 | 0 | none |" in summary
 
 
 def test_c2_pre_spawn_failure_halted_before_evaluation(tmp_path):
