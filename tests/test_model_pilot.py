@@ -407,6 +407,23 @@ def test_production_digest_not_synthetic():
     assert len(d)==64
 
 
+def test_pinned_digest_matches_real_tree():
+    """Real-tree regression gate: the committed pin must equal the
+    project's own source-v2 digest over the actual working tree. No
+    fixture, no monkeypatching: the production DIGEST_PATHS, the
+    production recipe and the real pin file. Checkout-specific by
+    design (raw-byte recipe; see README)."""
+    from harness.model_pilot import REVIEWED_SOURCE_PIN
+    pin_lines = (PROJECT_ROOT / REVIEWED_SOURCE_PIN).read_text(
+        encoding="utf-8").splitlines()
+    pin = next(line.strip() for line in pin_lines
+               if line.strip() and not line.startswith("#"))
+    assert compute_source_digest(PROJECT_ROOT) == pin, (
+        "pinned reviewed-source digest does not match the working tree; "
+        "recompute with compute_source_digest and re-pin per README "
+        "before any live work")
+
+
 def _reservation(tmp_path, name):
     files = list((tmp_path / name).rglob("reservation.json"))
     assert len(files) == 1

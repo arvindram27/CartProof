@@ -107,7 +107,7 @@ https://dev.meta.ai/docs/pricing-rate-limits on 2026-10-31.
   Stage 1 local allowance is $0.97 (2 Spark + 2 Wonder cells at the
   manifest's per-profile allowances).
 - Content gate: live runs require a fully clean worktree and require the
-  on-disk bytes of the 43-path live-execution closure (`DIGEST_PATHS` in
+  on-disk bytes of the 58-path live-execution closure (`DIGEST_PATHS` in
   `harness/model_pilot.py`) to match the digest pinned in
   `harness/reviewed_source.sha256`. `HEAD` is recorded in the attempt
   reservation as provenance, never compared, so publication no longer
@@ -119,6 +119,13 @@ https://dev.meta.ai/docs/pricing-rate-limits on 2026-10-31.
   changes. Review, not cryptography, is the boundary: the pin
   is data, and the reviewer recomputes the digest from the delivered bytes
   before approving any commit.
+
+  The only sanctioned recomputation helper is the project's own
+  `harness.model_pilot.compute_source_digest`; external helper scripts
+  are not authority for the pin. A real-tree regression test
+  (`test_pinned_digest_matches_real_tree` in
+  `tests/test_model_pilot.py`) asserts that the pin equals the
+  working-tree digest, so a stale pin fails the suite.
 
   Source-v2 recipe: for each path in `DIGEST_PATHS`, in listed order,
   record `rel|len|sha256hex` over the raw on-disk bytes (`read_bytes()`,
