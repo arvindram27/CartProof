@@ -1091,8 +1091,11 @@ DIGEST_PATHS = (
     "store/templates/index.html",
     "store/templates/product.html",
     "store/templates/cart.html",
+    "store/mcp_server.py",
     "tests/test_model_pilot.py",
     "tests/test_model_pilot_cli.py",
+    "tests/test_mcp_server.py",
+    "tests/test_mcp_server_mutations.py",
     "tests/fixtures/pilot_tripwire/sitecustomize.py",
 )
 

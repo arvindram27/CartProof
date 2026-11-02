@@ -2264,7 +2264,9 @@ _FROZEN_DIGEST_PATHS = [
     "store/faults.py", "store/models.py", "store/pages.py",
     "store/seed_catalog.json", "store/templates/index.html",
     "store/templates/product.html", "store/templates/cart.html",
+    "store/mcp_server.py",
     "tests/test_model_pilot.py", "tests/test_model_pilot_cli.py",
+    "tests/test_mcp_server.py", "tests/test_mcp_server_mutations.py",
     "tests/fixtures/pilot_tripwire/sitecustomize.py",
 ]
 
@@ -2343,7 +2345,7 @@ def test_source_digest_changes_on_byte_or_order_change(monkeypatch, tmp_path):
 
 def test_digest_paths_equal_frozen_closure():
     assert list(DIGEST_PATHS) == _FROZEN_DIGEST_PATHS
-    assert len(DIGEST_PATHS) == 43
+    assert len(DIGEST_PATHS) == 46
 
 
 def test_git_scope_refuses_dirty_worktree(monkeypatch, tmp_path):
