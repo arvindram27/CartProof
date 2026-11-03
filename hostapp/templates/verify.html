@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Verify my cart - CartProof demo</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; color: #1a1a1a; max-width: 46rem; }
+    .notice { background: #fff8e1; border: 1px solid #e0c97a; border-radius: 6px; padding: 0.75rem 1rem; margin: 0.75rem 0; }
+    .task { border: 1px solid #ddd; border-radius: 6px; padding: 0.75rem 1rem; margin: 0.75rem 0; }
+    .tablewrap { overflow-x: auto; margin: 0.75rem 0; }
+    table { border-collapse: collapse; }
+    td, th { border: 1px solid #ddd; padding: 0.35rem 0.7rem; text-align: left; overflow-wrap: anywhere; }
+    th { overflow-wrap: normal; }
+    .confirmed, .contradicted, .state-unknown { white-space: nowrap; }
+    .num { white-space: nowrap; }
+    @media (max-width: 480px) { body { margin: 0.75rem; } }
+    button { font-size: 1rem; padding: 0.5rem 1.2rem; }
+    .muted { color: #666; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <h1>Verify my cart</h1>
+  <div class="notice">
+    <strong>Demo store.</strong> Verification runs on this server against your
+    session's cart using CartProof's deterministic checks. No AI model is
+    involved in this page. Carts are per-browser-session and live only in this
+    demo's own database; when this demo is deployed on ephemeral storage,
+    carts can reset when the service restarts.
+  </div>
+  <div class="task">
+    <h2>{{ task.title }}</h2>
+    <p>{{ task.statement }}</p>
+  </div>
+  <h2>Your cart right now</h2>
+  {% if cart_ok %}
+    {% if lines %}
+    <div class="tablewrap"><table>
+      <tr><th>Item</th><th>SKU</th><th>Qty</th><th>Line total</th></tr>
+      {% for l in lines %}
+      <tr><td>{{ l.name }} ({{ l.label }})</td><td>{{ l.sku }}</td><td class="num">{{ l.quantity }}</td><td class="num">{{ "$%.2f"|format(l.line_total_cents / 100) }}</td></tr>
+      {% endfor %}
+    </table></div>
+    <p><strong>Cart total: {{ total_label }}</strong></p>
+    {% else %}
+    <p>Your cart is empty.</p>
+    {% endif %}
+  {% else %}
+    <p>Your cart could not be read just now; you can still try a verification run.</p>
+  {% endif %}
+  <form method="post" action="/verify/run">
+    <button type="submit">Verify my cart</button>
+  </form>
+  <p class="muted">
+    How it works: the server reads your cart twice over the store's own public
+    cart API and requires the reads to settle (same version and contents), then
+    checks the settled cart against the fixed task with CartProof's
+    deterministic constraint checks. Single-interface evidence; the full
+    dual-channel browser checks run offline. Your cart is found only through
+    your browser's session cookie - there is no way to ask about another
+    visitor's cart. A stolen session cookie could still impersonate your
+    session; that is a known limitation of this demo.
+  </p>
+  <p><a href="/">Back to the store</a></p>
+</body>
+</html>
