@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Verdict - CartProof demo</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; color: #1a1a1a; max-width: 46rem; }
+    .notice { background: #fff8e1; border: 1px solid #e0c97a; border-radius: 6px; padding: 0.75rem 1rem; margin: 0.75rem 0; }
+    .MATCH { background: #e6f4ea; border: 1px solid #81c995; border-radius: 6px; padding: 0.75rem 1rem; }
+    .MISMATCH { background: #fce8e6; border: 1px solid #e57373; border-radius: 6px; padding: 0.75rem 1rem; }
+    .unknown { background: #eef1f4; border: 1px solid #9aa0a6; border-radius: 6px; padding: 0.75rem 1rem; }
+    .tablewrap { overflow-x: auto; margin: 0.75rem 0; }
+    table { border-collapse: collapse; }
+    td, th { border: 1px solid #ddd; padding: 0.35rem 0.7rem; text-align: left; overflow-wrap: anywhere; }
+    th { overflow-wrap: normal; }
+    .confirmed, .contradicted, .state-unknown { white-space: nowrap; }
+    .num { white-space: nowrap; }
+    @media (max-width: 480px) { body { margin: 0.75rem; } }
+    .confirmed { color: #137333; font-weight: 600; }
+    .contradicted { color: #c5221f; font-weight: 600; }
+    .state-unknown { color: #5f6368; font-weight: 600; }
+    .muted { color: #666; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <h1>Verification verdict</h1>
+  <div class="notice">
+    <strong>Demo store.</strong> This verdict was produced on this server by
+    CartProof's deterministic checks against your session's cart. No AI model
+    was involved.
+  </div>
+  {% if overall == "MATCH" %}
+  <div class="MATCH"><h2>MATCH - your cart satisfies the task</h2></div>
+  {% elif overall == "MISMATCH" %}
+  <div class="MISMATCH"><h2>MISMATCH - your cart does not satisfy the task</h2></div>
+  {% else %}
+  <div class="unknown"><h2>UNKNOWN - the evidence does not decide</h2></div>
+  {% endif %}
+  <div class="task">
+    <p><strong>Task:</strong> {{ task.statement }}</p>
+  </div>
+  <h2>Per-constraint results</h2>
+  <div class="tablewrap"><table>
+    <tr><th>Constraint</th><th>Verdict</th><th>Evidence</th></tr>
+    {% for r in rows %}
+    <tr>
+      <td>{{ r.label }}</td>
+      {% if r.state == "confirmed" %}<td class="confirmed">confirmed</td>
+      {% elif r.state == "contradicted" %}<td class="contradicted">contradicted</td>
+      {% else %}<td class="state-unknown">unknown</td>{% endif %}
+      <td>{{ r.reason }}</td>
+    </tr>
+    {% endfor %}
+  </table></div>
+  {% if view %}
+  <h2>Your settled cart</h2>
+  <div class="tablewrap"><table>
+    <tr><th>Item</th><th>SKU</th><th>Qty</th><th>Line total</th></tr>
+    {% for l in view.lines %}
+    <tr><td>{{ l.name }} ({{ l.label }})</td><td>{{ l.sku }}</td><td class="num">{{ l.quantity }}</td><td class="num">{{ "$%.2f"|format(l.line_total_cents / 100) }}</td></tr>
+    {% endfor %}
+  </table></div>
+  <p><strong>Cart total: {{ total_label }}</strong> (cart version {{ view.version }})</p>
+  {% endif %}
+  <p class="muted">
+    Settlement: {{ settle_status }} after {{ sample_count }} sample(s) within a
+    {{ settle_ms }} ms deadline. Two independent reads of the store's public
+    cart API must agree on version and contents before any constraint is
+    checked. Single-interface evidence; full dual-channel browser checks run
+    offline. Where evidence does not decide, the verdict says unknown rather
+    than guessing.
+  </p>
+  <p><a href="/verify">Verify again</a> &middot; <a href="/cart">Edit cart</a> &middot; <a href="/">Store</a></p>
+</body>
+</html>
