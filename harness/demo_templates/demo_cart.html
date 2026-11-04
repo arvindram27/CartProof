@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf }}">
+  <title>CartProof demo cart</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; color: #1a1a1a; max-width: 52rem; }
+    .banner { background: #fff3cd; border: 1px solid #e0c97a; border-radius: 6px; padding: .6rem .9rem; margin-bottom: 1rem; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin: .75rem 0; }
+    .qty { font-size: 2rem; font-weight: 700; }
+    .row { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+    .item { flex: 1 1 12rem; }
+    .verdict { font-size: 1.2rem; font-weight: 700; }
+    .COMPLETE { color: #137333; }
+    .PARTIAL { color: #c5221f; }
+    .UNKNOWN, .unknown { color: #5f6368; }
+    .muted { color: #666; font-size: .85rem; }
+    .drop { background: #fce8e6; border: 1px solid #e57373; border-radius: 6px; padding: .6rem .9rem; margin: .5rem 0; }
+    .missing { color: #c5221f; font-weight: 600; }
+    button { font-size: 1rem; padding: .6rem 1.3rem; }
+    table { border-collapse: collapse; }
+    td, th { border: 1px solid #ddd; padding: .35rem .7rem; text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>CartProof demo cart</h1>
+  <div class="banner" id="banner">
+    Custom local CartProof Shopify-backed test storefront. The model selects one
+    allowed action, executed server-side through the API (the browser is
+    read-only and never clicks).{% if offline %} <strong>OFFLINE / FAKE TRANSPORTS.</strong>{% endif %}
+  </div>
+
+  <div class="row">
+    <div class="card item"><h2>Item A</h2><div class="qty" id="qty-a">-</div></div>
+    <div class="card item"><h2>Item B</h2><div class="qty" id="qty-b">-</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Task</h2>
+    <p>Request: add <span id="req-q">-</span> x <span id="req-a">-</span>.</p>
+    <p>Target: <span id="target">-</span></p>
+    <p>Verdict: <span class="verdict unknown" id="verdict">pending</span></p>
+    <p class="missing" id="missing"></p>
+    <div class="drop" id="drop" style="display:none"></div>
+    <p id="action-line" class="muted"></p>
+    <p id="saved" class="muted"></p>
+    <p class="muted">Status: <span id="status">not_started</span> &middot; phase: <span id="phase">-</span>
+      &middot; reads: <span id="reads">0</span> &middot; model calls: <span id="calls">0</span>
+      &middot; Shopify requests: <span id="reqs">0</span></p>
+  </div>
+
+  <p>
+    <button id="start">Start demo run</button>
+    <span id="start-result" class="muted"></span>
+  </p>
+
+  <script>
+    const csrf = document.querySelector('meta[name="csrf-token"]').content;
+    function txt(id, v) { document.getElementById(id).textContent = v === null || v === undefined ? "-" : String(v); }
+    function qtyMapLabel(m) {
+      if (!m) return "-";
+      const parts = []; for (const k of ["A","B"]) if (m[k] !== undefined) parts.push(k + "=" + m[k]);
+      return parts.length ? parts.join(", ") : "-";
+    }
+    function missingLabel(m) {
+      if (!m || !Object.keys(m).length) return "";
+      return "Missing: " + Object.keys(m).map(k => k + " x" + m[k]).join(", ");
+    }
+    let timer = null;
+    function clearAll() {
+      // disconnect / invalid evidence: a previously shown COMPLETE must vanish.
+      txt('qty-a', null); txt('qty-b', null);
+      txt('verdict', 'unavailable'); document.getElementById('verdict').className = 'verdict unknown';
+      txt('status', 'unavailable'); txt('target', '-'); txt('phase', '-');
+      txt('reads', null); txt('calls', null); txt('reqs', null);
+      txt('action-line', ''); txt('saved', '');
+      document.getElementById('missing').textContent = '';
+      document.getElementById('drop').style.display = 'none';
+    }
+    async function refresh() {
+      let s;
+      try {
+        const r = await fetch('/demo/state', {cache: 'no-store'});
+        if (!r.ok) throw new Error('bad status');
+        s = await r.json();
+      } catch (e) {
+        clearAll();
+        return;
+      }
+      if (s.status === 'unavailable') {
+        clearAll();
+        return;
+      }
+      txt('qty-a', s.observed ? s.observed.A : null);
+      txt('qty-b', s.observed ? s.observed.B : null);
+      txt('req-q', s.request ? s.request.quantity : null);
+      txt('req-a', s.request ? s.request.alias : null);
+      txt('target', s.target ? qtyMapLabel(s.target) : '-');
+      // NEVER invent COMPLETE from status: verdict is authoritative.
+      const terminal = (s.status === 'complete' || s.status === 'failed' || s.status === 'unknown');
+      const v = s.verdict || (terminal ? 'none' : 'pending');
+      txt('verdict', v);
+      document.getElementById('verdict').className = 'verdict ' + (s.verdict || 'unknown');
+      document.getElementById('missing').textContent = missingLabel(s.missing);
+      txt('action-line', s.action ? ('Selected action: ' + s.action) : '');
+      const drop = document.getElementById('drop');
+      if (s.controlled_drop) {
+        drop.style.display = 'block';
+        const hist = (s.recovery || s.status === 'complete')
+          ? 'A controlled fault was deliberately dropped earlier: NO Shopify mutation was sent for that step.'
+          : 'Deliberately dropped action: NO Shopify mutation was sent.';
+        drop.textContent = hist;
+      } else {
+        drop.style.display = 'none';
+      }
+      txt('status', s.status);
+      txt('phase', s.phase);
+      txt('reads', s.read_seq);
+      txt('calls', s.model_calls);
+      txt('reqs', s.shopify_requests);
+      if (s.saved_check) {
+        txt('saved', 'Saved checked result: ' + s.saved_check.verdict + ' (checked at read ' + s.read_seq + '; not a live guarantee).');
+      } else {
+        txt('saved', '');
+      }
+      // A reloaded already-started page must not re-enable start.
+      const btn = document.getElementById('start');
+      if (s.status !== 'not_started') { btn.disabled = true; }
+      // Keep polling so a disconnection after any state is detected and a
+      // previously shown COMPLETE is cleared to unavailable.
+    }
+    timer = setInterval(refresh, 1000);
+    document.getElementById('start').addEventListener('click', async () => {
+      const btn = document.getElementById('start');
+      btn.disabled = true;
+      const res = await fetch('/demo/start', {method: 'POST', headers: {'x-demo-csrf': csrf}});
+      let j = {};
+      try { j = await res.json(); } catch (e) {}
+      const out = document.getElementById('start-result');
+      if (res.ok && j.started === true) {
+        out.textContent = 'started';
+      } else if (res.ok && j.started === false) {
+        out.textContent = 'refused: ' + (j.reason || 'already started');
+        btn.disabled = false;
+      } else {
+        out.textContent = 'refused';
+      }
+    });
+    refresh();
+  </script>
+</body>
+</html>

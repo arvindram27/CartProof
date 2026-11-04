@@ -57,7 +57,7 @@ def validate_profile(config):
     need(config.get('pricing_as_of')=='2026-11-04','pricing_date')
     return config
 
-def verify_offline_receipt(receipt,source_digest,test_digest,profile_digest):
+def verify_offline_receipt(receipt,source_digest,test_digest,profile_digest,require_ui=False):
     need(receipt.get('complete') is True and receipt.get('real_dependency_import') is True,
          'offline_real_closure_required')
     need(receipt.get('source_digest')==source_digest and receipt.get('tests_sha256')==test_digest
@@ -68,6 +68,8 @@ def verify_offline_receipt(receipt,source_digest,test_digest,profile_digest):
     need(receipt.get('tests_failed')==0 and receipt.get('tests_run',0)>=48,'offline_tests_failed')
     need(receipt.get('mcp_stub_used') is False,'mcp_stub_refused')
     need(receipt.get('platform')=='win32','offline_windows_required')
+    if require_ui:
+        need(receipt.get('ui_route') is True,'ui_route_unverified')
 
 def reserve_attempt(parent,name):
     need(isinstance(name,str) and len(name)==16 and all(c in '0123456789abcdef' for c in name),

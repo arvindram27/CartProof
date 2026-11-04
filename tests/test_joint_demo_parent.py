@@ -11,7 +11,7 @@ class Parent(unittest.TestCase):
   (root/'harness/joint_demo_source_manifest.json').write_text('{}')
   (root/'harness/joint_demo_profile.json').write_bytes((test_joint_candidate.ROOT/'harness/joint_demo_profile.json').read_bytes())
   (control/'offline-receipt-source-fedcba9876543210.json').write_text('{"windows_owned_lifecycle_verified":true,"validation_id":"fedcba9876543210"}')
-  for n in ['test_joint_demo.py','test_joint_demo_control.py','test_joint_demo_parent.py']:(root/'tests'/n).write_text('')
+  for n in ['test_joint_demo.py','test_joint_demo_control.py','test_joint_demo_parent.py','test_demo_ui.py']:(root/'tests'/n).write_text('')
   return root
  def runparent(self,root,worker,allow=True):
   output=io.StringIO()

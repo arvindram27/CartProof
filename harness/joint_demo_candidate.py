@@ -26,11 +26,12 @@ class JointDemo:
     network transports, changes budgets, retries, or enables live mode.
     """
     def __init__(self, backend, model, mapping, output, *, secrets=(), emit=None,
-                 timeout_seconds=300, clock=time.monotonic):
+                 timeout_seconds=300, clock=time.monotonic, gate=None):
         self.backend, self.model = backend, model
         self.mapping, self.output = mapping, Path(output)
         self.secrets = tuple(s for s in secrets if s)
         self.emit = emit or (lambda line: None)
+        self.gate = gate or (lambda phase: None)
         self.clock = clock
         self.deadline = clock() + timeout_seconds
         self.events = []
@@ -160,8 +161,13 @@ class JointDemo:
         need(result.get('baseline_provenance', {}).get('cart_ref') ==
              result.get('check_provenance', {}).get('cart_ref'), 'check_identity')
         self.results.append(self.backend.redact(result))
+        # Narrow backward-compatible seam: carry the private read token captured
+        # for the read consumed by THIS run_check (injected into check_provenance
+        # by the PublishingBackend), never an emitter-time latest token. The
+        # default API-only backend injects no token, so this stays None there.
+        read_token = (result.get('check_provenance') or {}).get('_read_token')
         self.publish('independent_check', scenario=label, verdict=expected_verdict,
-                     unrelated_item_preserved=True)
+                     unrelated_item_preserved=True, read_token=read_token)
         return result
 
     def validate(self):
@@ -218,6 +224,10 @@ class JointDemo:
         mismatch = self.check(second, {self.a: 1, self.b: 1}, 'controlled_drop', 'PARTIAL')
         need(mismatch['mismatches'] == [{'sku': self.a, 'expected_quantity': 2,
                                        'actual_quantity': 1}], 'wrong_discrepancy')
+        # Bounded presentation hold between the checked PARTIAL and recovery.
+        # Default is a no-op; the UI worker supplies a bounded, deadline-aware
+        # hold. Never pauses an in-flight request or extends the deadline.
+        self.gate('controlled_drop')
         self.phase = 'recovery'
         observed = self.state()
         self.equal(observed, second.baseline)

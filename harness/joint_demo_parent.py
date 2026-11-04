@@ -35,7 +35,8 @@ def main(argv=None):
         profile=validate_profile(json.loads(profile_path.read_text(encoding='utf-8')))
         receipt=json.loads(receipt_path.read_text(encoding='utf-8'))
         tests_digest=hashlib.sha256((digest(ROOT/'tests/test_joint_demo.py')+
-                    digest(ROOT/'tests/test_joint_demo_control.py')+digest(ROOT/'tests/test_joint_demo_parent.py')).encode()).hexdigest()
+                    digest(ROOT/'tests/test_joint_demo_control.py')+digest(ROOT/'tests/test_joint_demo_parent.py')+
+                    digest(ROOT/'tests/test_demo_ui.py')).encode()).hexdigest()
         stage='offline_receipt_verify'
         verify_offline_receipt(receipt,source,tests_digest,digest(profile_path))
         need(receipt.get('validation_id')==args.validation_id,'validation_identity_mismatch')
