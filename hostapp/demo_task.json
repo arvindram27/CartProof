@@ -1,0 +1,10 @@
+{
+  "task_id": "hostapp-demo-v1",
+  "title": "The demo task",
+  "statement": "Put together a cart with: exactly 2 Court Classic shoes (White, size 9); exactly 2 DISTINCT bottles from this set: Hiker Water Bottle (Navy, 500ml), Hiker Water Bottle (Steel, 750ml), Thermo Flask (Black, 500ml); and a cart total of at most $200.00. Other items are allowed - only these constraints are checked.",
+  "constraints": [
+    {"type": "item_quantity", "sku": "SHOE-CRT-9-WHITE", "quantity": 2},
+    {"type": "count_distinct", "skus": ["BTL-HIK-500-NAVY", "BTL-HIK-750-STEEL", "BTL-THR-500-BLACK"], "count": 2},
+    {"type": "budget_max", "max_cents": 20000}
+  ]
+}

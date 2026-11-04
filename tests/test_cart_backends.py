@@ -254,3 +254,73 @@ def test_official_doc_example_shape_parses():
     state = ShopifyStorefrontBackend._canonicalize(doc["data"]["cart"])
     assert state["lines"] == {FAKE_VARIANT_GID: 1}
     assert state["resolution"] == "remote-cart"
+
+# ------------------------------------- R3 regression: live document guard
+def _assert_document_balanced(doc: str) -> None:
+    """Structural sanity, NOT a GraphQL parse (no new dependency): strip
+    comments and string literals, then require balanced () and {}, no
+    close before its open, and nothing but whitespace after the root
+    selection set closes. Triple-quoted block strings are not handled;
+    no document this backend emits uses them."""
+    depth_curly = 0
+    depth_paren = 0
+    i = 0
+    n = len(doc)
+    while i < n:
+        ch = doc[i]
+        if ch == "#":
+            while i < n and doc[i] != "\n":
+                i += 1
+            continue
+        if ch == '"':
+            i += 1
+            while i < n and doc[i] != '"':
+                i += 2 if doc[i] == "\\" else 1
+            i += 1
+            continue
+        if ch == "{":
+            depth_curly += 1
+        elif ch == "}":
+            depth_curly -= 1
+            assert depth_curly >= 0, f"unopened '}}' at offset {i}"
+            if depth_curly == 0:
+                rest = doc[i + 1:]
+                assert not rest.strip(), (
+                    f"trailing tokens after root close: {rest!r}")
+        elif ch == "(":
+            depth_paren += 1
+        elif ch == ")":
+            depth_paren -= 1
+            assert depth_paren >= 0, f"unopened ')' at offset {i}"
+        i += 1
+    assert depth_curly == 0, f"unclosed '{{' x{depth_curly}"
+    assert depth_paren == 0, f"unclosed '(' x{depth_paren}"
+
+
+def test_shopify_graphql_documents_are_balanced(monkeypatch):
+    """R3 regression: the pinned catalog document shipped ONE extra '}'
+    as its last character - Shopify's live parser rejected it ("actual:
+    RCURLY at [1, 143]") while every offline gate passed, because the
+    fakes match request documents by substring and never parse them.
+    Capture every document this backend emits and require structural
+    balance, so this defect class fails offline."""
+    backend, _fake = _shopify()
+    docs = []
+
+    def capture(query, variables):
+        docs.append(query)
+        if "cartCreate" in query:
+            return {"cartCreate": {"cart": {"id": FAKE_CART_ID},
+                                   "userErrors": []}}
+        return {}
+
+    monkeypatch.setattr(backend, "_gql", capture)
+    backend.read_catalog()
+    backend.add_line(NAVY, 1, expected_version=None)
+    backend.set_line_quantity("gid://shopify/CartLine/1", 2,
+                              expected_version=None)
+    backend.delete_line("gid://shopify/CartLine/1", expected_version=None)
+    backend.acquire_state()
+    assert len(docs) == 6, f"expected 6 emitted documents, got {len(docs)}"
+    for doc in docs:
+        _assert_document_balanced(doc)

@@ -413,7 +413,7 @@ class ShopifyStorefrontBackend:
         data = self._gql(
             "query { products(first: 20) { edges { node { id title "
             "variants(first: 20) { edges { node { id sku price { amount "
-            "currencyCode } } } } } } } } }", {})
+            "currencyCode } } } } } } } }", {})
         return self.redact(data)
 
     def _cart_mutation(self, name: str, query: str,
